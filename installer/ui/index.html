@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installer Steam Upgraded</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win sq">
+  <header class="tb" data-tauri-drag-region>
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" data-tauri-drag-region><rect x="1" y="1" width="22" height="22" rx="7" class="logo-bg"></rect><path d="M7 14l5-5 5 5" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="logo-fg"></path></svg>
+    <span class="tb-name" data-tauri-drag-region>Steam Upgraded</span>
+    <span class="tb-sub" id="tb-sub" data-tauri-drag-region>Installation</span>
+    <span class="sim" id="sim" hidden data-tauri-drag-region></span>
+    <span class="dots rd">
+      <button type="button" class="dot dot-min" id="btn-min" aria-label="Réduire"></button>
+      <button type="button" class="dot dot-close" id="btn-close" aria-label="Fermer"></button>
+    </span>
+  </header>
+  <main id="screen" class="screen" aria-live="polite"></main>
+  <div id="modal-root"></div>
+</div>
+<script src="mock.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

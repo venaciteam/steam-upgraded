@@ -1,0 +1,7 @@
+node_modules/
+.millennium/
+installer/payload/
+installer/dist/
+installer/src-tauri/target/
+installer/src-tauri/gen/
+.millennium/lsp/

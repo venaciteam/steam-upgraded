@@ -1,0 +1,42 @@
+[plugin]
+id = "com.venacity.steamupgraded"
+name = "Steam Upgraded"
+version = "0.1.0"
+author = "Venacity"
+description = "Une nouvelle interface pour Steam : bibliothèque, fiches de jeu, magasin, paramètres et Big Picture."
+
+[assets]
+# Ressources intégrées au plugin à la compilation
+resources=["resources/**/*"]
+
+[backend]
+entry = "backend/main.lua"
+sources = ["backend/**/*.lua"]
+
+[frontend]
+entry = "frontend/index.tsx"
+
+[frontend.globals]
+
+[compiler]
+# auto : trouve Millennium et y installe le plugin compilé
+output_path = "auto"
+
+[dev]
+# Redémarre le backend à chaque modification ; l'interface de Steam n'est jamais rechargée d'office
+auto_restart = true
+reload_steamui_when = "never"
+
+[inspect]
+depth = 4
+colors = true
+show_hidden = true
+
+[logger]
+padding = 0
+backend_prefix  = "BCK"
+frontend_prefix = "FRT"
+webview_prefix  = "WEB"
+
+[patches]
+debug = true
