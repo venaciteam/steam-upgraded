@@ -10,6 +10,17 @@ Steam Upgraded est un plugin pour Millennium qui remplace l'interface de Steam p
 
 ![Bibliothèque](media/bureau-bibliotheque.jpg)
 
+<!-- Liens permanents vers la dernière version : chaque publication doit joindre ces deux fichiers, avec ces noms exacts. -->
+
+## Télécharger
+
+**Windows 10 et 11**, avec Steam installé :
+
+- **[Télécharger l'installeur](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-Setup.exe)** : il s'occupe de tout, Millennium compris. En cas de doute, c'est celui-ci.
+- **[Télécharger le plugin seul](https://github.com/venaciteam/steam-upgraded/releases/latest/download/com.venacity.steamupgraded.star)** : si Millennium est déjà installé (voir [Installation manuelle](#installation)).
+
+Le message de Windows au premier lancement et les étapes : voir [Installation](#installation). Toutes les versions : [publications](../../releases).
+
 | Fiche d'un jeu | Magasin | Paramètres › Apparence |
 | --- | --- | --- |
 | ![Fiche d'un jeu](media/bureau-fiche.jpg) | ![Magasin](media/bureau-magasin.jpg) | ![Paramètres › Apparence](media/bureau-apparence.jpg) |
@@ -57,13 +68,13 @@ Steam Upgraded est un plugin pour Millennium qui remplace l'interface de Steam p
 
 Il faut Windows et Steam. L'installeur s'occupe du reste, Millennium compris.
 
-1. Téléchargez **`Installer Steam Upgraded <version>.exe`** depuis la [dernière publication](../../releases/latest).
+1. Téléchargez **[`Steam-Upgraded-Setup.exe`](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-Setup.exe)** (dernière version).
 2. Lancez-le. L'installeur n'est pas signé : Windows SmartScreen peut afficher « Windows a protégé votre ordinateur ». Cliquez alors sur « Informations complémentaires », puis « Exécuter quand même ».
 3. Suivez les écrans. L'installeur vérifie Steam et Millennium, installe ou met à jour Millennium si besoin (version 3.6 ou plus récente, téléchargée depuis ses publications officielles et vérifiée), installe le plugin, puis relance Steam. Steam doit être fermé pendant l'installation : l'installeur vous le demande s'il est ouvert.
 
 En cas d'échec, tout ce qui a été modifié est remis en place.
 
-**Installation manuelle** (si Millennium est déjà installé) : copiez `com.venacity.steamupgraded.star` (fourni dans chaque publication) dans le dossier `millennium\plugins` de Steam, puis activez « Steam Upgraded » dans les réglages de Millennium.
+**Installation manuelle** (si Millennium est déjà installé) : copiez [`com.venacity.steamupgraded.star`](https://github.com/venaciteam/steam-upgraded/releases/latest/download/com.venacity.steamupgraded.star) (fourni dans chaque publication) dans le dossier `millennium\plugins` de Steam, puis activez « Steam Upgraded » dans les réglages de Millennium.
 
 ## SteamGridDB (facultatif)
 
