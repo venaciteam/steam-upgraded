@@ -3,6 +3,7 @@ import { goBack, goForward, usePath } from '../core/history';
 import { mainWindow, navigate, openSteamWeb, PRESENCE, presenceState, ROUTES, schedulePresenceReturn, selfPersona, setPresence } from '../core/steam';
 import { setSetting, useSettings } from '../core/settings';
 import { beforeNextFrame } from '../core/transitions';
+import { requestUpdatesPage, useUpdateAvailable } from '../features/updates';
 
 const w = window as any;
 
@@ -40,11 +41,13 @@ export function NavBar() {
 		const t = setInterval(read, 400);
 		return () => clearInterval(t);
 	}, [onWeb]);
+	// Nouvelle version de Steam Upgraded : pastille discrète sur Paramètres, qui ouvre alors « Mises à jour »
+	const update = useUpdateAvailable();
 	const items = [
 		{ label: 'Bibliothèque', active: /^\/steamupgraded\/(library|app|album|captures)/.test(path) || (path.startsWith('/library') && !path.startsWith('/library/downloads')), go: () => navigate(ROUTES.library) },
-		{ label: 'Magasin', active: path.startsWith('/steamupgraded/store') || path.startsWith('/steamupgraded/vente'), go: () => navigate(ROUTES.store) },
+		{ label: 'Magasin', active: /^\/steamupgraded\/(store|vente|souhaits|panier)/.test(path), go: () => navigate(ROUTES.store) },
 		{ label: 'Communauté', active: onWeb && community, go: () => openSteamWeb('https://steamcommunity.com/') },
-		{ label: 'Paramètres', active: path.startsWith('/steamupgraded/settings'), go: () => navigate(ROUTES.settings) },
+		{ label: 'Paramètres', active: path.startsWith('/steamupgraded/settings'), go: () => (update && requestUpdatesPage(), navigate(ROUTES.settings)) },
 	];
 	const current = items.find((it) => it.active);
 	const activeIndex = items.indexOf(current as any);
@@ -85,7 +88,10 @@ export function NavBar() {
 			<nav aria-label="Sections" ref={navRef}>
 				<span className="sp-topnav-ind" ref={indRef} aria-hidden="true" />
 				{items.map((it) => (
-					<button key={it.label} type="button" aria-current={it.active ? 'page' : undefined} onClick={it.go}>{it.label}</button>
+					<button key={it.label} type="button" aria-current={it.active ? 'page' : undefined} onClick={it.go} title={update && it.label === 'Paramètres' ? 'Une mise à jour de Steam Upgraded est disponible' : undefined}>
+						{it.label}
+						{update && it.label === 'Paramètres' && <span className="sp-update-dot" aria-label="mise à jour disponible" />}
+					</button>
 				))}
 			</nav>
 			{/* Fenêtre étroite : les onglets se replient en une pilule qui se déploie au survol (CSS, voir theme.ts) */}

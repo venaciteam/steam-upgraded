@@ -6,6 +6,7 @@ require("sgdb")
 require("store")
 require("art")
 require("uninstall")
+require("updates")
 
 local function on_load()
     logger:info("Steam Upgraded chargé (Millennium " .. millennium.version() .. ")")

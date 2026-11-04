@@ -42,14 +42,14 @@ The Windows warning on first launch and the steps: see [Installation](#installat
 - **A single top bar**: navigation, downloads, news, friends and account, instead of Steam's stacked bars and menus.
 - **Library**: ready-made views (in progress, never played, installed, lent by family, multiple copies…), your collections, your Steam Family members, a "Resume" row and a grid of covers that grow on hover.
 - **Game page**: banner and logo, playtime, achievements, copies available in your family (and which one to use), collections, friends who own the game.
-- **Store**: the deals that matter to you, starting with your wishlist, at your country's prices.
+- **Store**: the deals that matter to you, starting with your wishlist, at your country's prices; your whole wishlist (filters, sorting, add to cart) and your Steam cart (payment happens on Steam's own page).
 - **One settings page**: Steam Upgraded's settings and Steam's own, side by side.
 - **Steam pages and windows restyled**: downloads, menus, dialogs, properties, notifications, friends and chat, screenshots, soundtracks and music player.
 - **Page transitions** and an animated opening, short, and following Windows' "reduce animations" setting.
 
 **Big Picture**
 
-- Home, library, game pages, store and product page, achievements, downloads, search, media, soundtracks, friends and chat: screens designed for a controller, showing the buttons of your own controller (Xbox, PlayStation…).
+- Home, library, game pages, store, product page, wishlist and cart, achievements, downloads, search, media, soundtracks, friends and chat: screens designed for a controller, showing the buttons of your own controller (Xbox, PlayStation…).
 - Steam's remaining native menus and screens (settings, properties, Steam menu, quick access, virtual keyboard) are restyled in the same colors.
 
 **Customization**
@@ -90,9 +90,9 @@ The key stays on your PC, in Millennium's configuration. Everyone uses their own
 
 ## Updates
 
-To move to a new version, download the new installer and run it: it offers to update to the new version. Your settings, SteamGridDB key and custom artwork are kept.
+Since version 0.1.1, Steam Upgraded checks for new versions by itself (when Steam starts, then regularly). When one is out, a dot appears on the **Paramètres** tab: in **Paramètres › Mises à jour**, read what's new and click "Installer la mise à jour". The file is verified before being installed, Steam's interface reloads in a few seconds, and your settings, SteamGridDB key and custom artwork are kept. You can also skip a version, or go back to the previous one if an update causes trouble.
 
-The installed version is shown in **Paramètres › Mises à jour**. Updating directly from these settings is coming in a future version.
+From version 0.1.0, or to repair an installation: download the new installer and run it, it offers to update to the new version.
 
 ## Uninstalling
 

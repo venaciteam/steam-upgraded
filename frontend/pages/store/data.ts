@@ -25,6 +25,16 @@ export type Deal = {
 	free?: boolean;
 	priority?: number;
 	added?: number;
+	/** Ce qu'on met au panier pour acheter le jeu (paquet de l'édition de base, ou lot). */
+	packageid?: number;
+	bundleid?: number;
+	/** Nombre de jeux compris (lot, édition). */
+	games?: number;
+	/** Sortie (horodatage Unix) ; à venir : `comingSoon`, date annoncée en clair dans `releaseText`. */
+	release?: number;
+	comingSoon?: boolean;
+	releaseText?: string;
+	releaseYearOnly?: boolean;
 	/** Plus bas historique : aucune source fiable sans clé externe, reste vide tant qu'aucune donnée réelle n'existe. */
 	historicalLow?: number;
 };
@@ -79,6 +89,11 @@ export function storeReady(): Promise<void> {
 			} catch {}
 		})();
 	return ready;
+}
+
+/** Code du pays du magasin (FR en attendant qu'il soit réglé). */
+export function storeCountry(): string {
+	return country;
 }
 
 /** Pays et devise du magasin, une fois réglés (France et euro en attendant). */
@@ -156,6 +171,23 @@ export function loadWishlist(steamid: string, force = false): Promise<Wishlist> 
 		const d = await parse(backend.sp_store_wishlist(steamid));
 		return { ...d, items: arr<Deal>(d.items).map(fix) };
 	}, force);
+}
+
+/** Article du panier tel que le magasin le décrit ; `key` vaut « p:<paquet> » ou « b:<lot> ». */
+export type CartItem = Deal & { key: string };
+
+/** Noms, images et prix actuels des paquets et lots du panier (le panier lui-même vient de cart.ts). */
+export function loadCartItems(targets: { packageid?: number; bundleid?: number }[]): Promise<Map<string, CartItem>> {
+	const ids = targets.map(cartKey).sort();
+	return cached(`cart:${ids.join(',')}`, async () => {
+		const d = await parse(backend.sp_store_cart_items(JSON.stringify(targets.map((t) => (t.packageid ? { packageid: t.packageid } : { bundleid: t.bundleid })))));
+		return new Map(arr<any>(d.items).map((it) => [it.key, fix(it) as CartItem]));
+	});
+}
+
+/** Le paquet ou le lot qui correspond à cet article du panier. */
+export function cartKey(t: { packageid?: number; bundleid?: number }): string {
+	return t.packageid ? `p:${t.packageid}` : `b:${t.bundleid}`;
 }
 
 export function loadFeatured(force = false): Promise<Featured> {

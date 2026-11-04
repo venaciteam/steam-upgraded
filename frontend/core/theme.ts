@@ -485,6 +485,8 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .sp-topnav nav button{position:relative;height:32px;padding:0 13px;border:0;border-radius:var(--sp-r-sm);background:transparent;color:var(--sp-muted);font-weight:700;font-size:14px;transition:color .2s;}
 .sp-topnav nav button:hover{color:var(--sp-text);}
 .sp-topnav nav button[aria-current="page"]{color:var(--sp-text);}
+/* Mise à jour de Steam Upgraded disponible (onglet Paramètres, entrée « Mises à jour ») */
+.sp-update-dot{display:inline-block;width:7px;height:7px;margin-left:6px;vertical-align:2px;border-radius:50%;background:var(--sp-accent);box-shadow:0 0 6px var(--sp-accent);corner-shape:round !important;}
 /* Pastille de l'onglet actif (TopNav.tsx) : glisse d'un onglet à l'autre */
 .sp-topnav-ind{position:absolute;top:0;left:0;width:0;height:32px;border-radius:var(--sp-r-sm);background:var(--sp-surface2);opacity:0;pointer-events:none;}
 .sp-topnav nav.sp-ind-ready .sp-topnav-ind{transition:transform .26s cubic-bezier(.2,.8,.2,1),width .26s cubic-bezier(.2,.8,.2,1),opacity .2s;}

@@ -205,12 +205,21 @@ const RAW = `
 .spbp-day{display:flex;align-items:center;gap:18px;margin:6px 0 2px;font-size:15px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--sp-muted);}
 .spbp-day::before,.spbp-day::after{content:"";flex:1;height:1px;background:var(--sp-line);}
 
+/* Magasin : accès à la liste de souhaits et au panier, lignes du panier */
+.spbp .spbp-storelink.DialogButton,.spbp button.spbp-storelink{all:unset;box-sizing:border-box;flex:1;display:flex;align-items:center;gap:16px;min-height:58px;padding:0 22px;border-radius:24px;border:2px solid var(--sp-line);background:var(--sp-surface2);color:var(--sp-text);font-family:var(--sp-font);font-size:23px;font-weight:800;white-space:nowrap;cursor:pointer;outline:3px solid transparent;outline-offset:4px;}
+.spbp .spbp-storelink.gpfocus{outline-color:var(--sp-accent);box-shadow:var(--spbp-glow);}
+.spbp-count{min-width:38px;height:32px;padding:0 10px;border-radius:16px;background:var(--sp-bg);color:var(--sp-text);font-size:18px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}
+.spbp-count--strong{background:var(--sp-accent);color:var(--sp-accent-ink);}
+.spbp .spbp-cartline.DialogButton,.spbp button.spbp-cartline{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:26px;padding:14px 24px 14px 14px;border-radius:26px;border:2px solid var(--sp-line);background:var(--sp-surface);color:var(--sp-text);font-family:var(--sp-font);cursor:pointer;outline:3px solid transparent;outline-offset:3px;}
+.spbp .spbp-cartline.gpfocus{border-color:transparent;outline-color:var(--sp-accent);box-shadow:var(--spbp-glow-strong);}
+.spbp-cart-tag{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:10px;font-size:17px;font-weight:700;}
+
 @media (prefers-reduced-motion:reduce){.spbp *{transition:none !important;}}
 `;
 
 // Les boutons de Steam (DialogButton) ont des règles très spécifiques (button.x.DialogButton:enabled…) :
 // les nôtres passent en !important pour l'emporter.
-const BUTTON_CLASSES = /spbp-(btn|capsule|tile|view|row|wish|deal|pill|chip-btn|card-btn|ach|result|empty|track|round|friend)\b/;
+const BUTTON_CLASSES = /spbp-(btn|capsule|tile|view|row|wish|deal|pill|chip-btn|card-btn|ach|result|empty|track|round|friend|storelink|cartline)\b/;
 
 export const BP_CSS = RAW.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, sel: string, body: string) => {
 	if (!BUTTON_CLASSES.test(sel) || sel.trim().startsWith('@')) return rule;

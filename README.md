@@ -40,14 +40,14 @@ Le message de Windows au premier lancement et les étapes : voir [Installation](
 - **Une seule barre en haut** : navigation, téléchargements, actualités, contacts et compte, au lieu des barres et menus empilés de Steam.
 - **Bibliothèque** : vues prêtes à l'emploi (en cours, jamais lancés, installés, prêtés par la famille, plusieurs copies…), vos collections, les membres de votre Famille Steam, une rangée « Reprendre » et une grille de jaquettes qui s'agrandissent au survol.
 - **Fiche de jeu** : bannière et logo, temps de jeu, succès, copies disponibles dans la famille (et choix de la copie utilisée), collections, contacts qui ont le jeu.
-- **Magasin** : les promotions qui vous concernent, à commencer par celles de votre liste de souhaits, aux prix de votre pays.
+- **Magasin** : les promotions qui vous concernent, à commencer par celles de votre liste de souhaits, aux prix de votre pays ; toute votre liste de souhaits (filtres, tris, ajout au panier) et votre panier Steam (le paiement se fait sur la page de Steam).
 - **Paramètres réunis** : ceux de Steam Upgraded et ceux de Steam dans une seule page.
 - **Pages et fenêtres de Steam habillées** : téléchargements, menus, dialogues, propriétés, notifications, contacts et discussions, captures, bandes-son et lecteur de musique.
 - **Transitions entre les pages** et ouverture animée, courtes, qui respectent le réglage « Animations réduites » de Windows.
 
 **En Big Picture**
 
-- Accueil, bibliothèque, fiches de jeu, magasin et page de vente, succès, téléchargements, recherche, médias, bandes-son, contacts et discussions : des écrans pensés pour la manette, avec les boutons de votre manette (Xbox, PlayStation…).
+- Accueil, bibliothèque, fiches de jeu, magasin, page de vente, liste de souhaits et panier, succès, téléchargements, recherche, médias, bandes-son, contacts et discussions : des écrans pensés pour la manette, avec les boutons de votre manette (Xbox, PlayStation…).
 - Les menus et écrans de Steam restés natifs (paramètres, propriétés, menu Steam, accès rapide, clavier virtuel) sont habillés aux mêmes couleurs.
 
 **Personnalisation**
@@ -88,9 +88,9 @@ La clé reste sur votre PC, dans la configuration de Millennium. Chaque personne
 
 ## Mises à jour
 
-Pour passer à une nouvelle version, téléchargez le nouvel installeur et lancez-le : il propose « Mettre à jour vers » la nouvelle version. Vos réglages, votre clé SteamGridDB et vos visuels personnalisés sont conservés.
+Depuis la version 0.1.1, Steam Upgraded vérifie lui-même s'il existe une nouvelle version (au démarrage de Steam, puis régulièrement). Quand c'est le cas, une pastille apparaît sur l'onglet **Paramètres** : dans **Paramètres › Mises à jour**, lisez les nouveautés puis cliquez sur « Installer la mise à jour ». Le fichier est vérifié avant d'être installé, l'interface de Steam se recharge en quelques secondes, et vos réglages, votre clé SteamGridDB et vos visuels personnalisés sont conservés. Vous pouvez aussi ignorer une version, ou revenir à la précédente si une mise à jour pose problème.
 
-La version installée est affichée dans **Paramètres › Mises à jour**. La mise à jour directement depuis ces paramètres arrivera dans une prochaine version.
+Avec la version 0.1.0, ou pour réparer une installation : téléchargez le nouvel installeur et lancez-le, il propose « Mettre à jour vers » la nouvelle version.
 
 ## Désinstallation
 

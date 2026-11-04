@@ -1,8 +1,8 @@
 // Page Magasin (/steamupgraded/store) : promos de la liste de souhaits et promos du moment.
-// Lecture seule : aucun achat, aucun panier, aucune modification de la liste de souhaits.
+// Liste de souhaits et panier : leurs pages (Wishlist.tsx, Cart.tsx), boutons en tête de page.
 import { useMemo, useState } from 'react';
 import { filterDeals, loadFeatured, loadWishlist, mySteamId, ownershipMap, PAGE, plural, useAsync, useSpecials, wishlistOnSale, int, useStoreRegion } from './store/data';
-import { Banner, DealRow, Notice, OpenFullStore, SectionHead, Skeleton, STORE_CSS, WishlistSection } from './store/sections';
+import { Banner, DealRow, Notice, OpenFullStore, SectionHead, Skeleton, STORE_CSS, StoreTabs, WishlistSection } from './store/sections';
 import { FilterChips, FilterPill, Filters, IconRefresh, NO_FILTERS, SortId, SortMenu } from './store/ui';
 import { usePageTransition } from '../core/transitions';
 
@@ -52,6 +52,7 @@ export function StorePage() {
 						<IconRefresh />
 					</button>
 					<OpenFullStore />
+					<StoreTabs current="store" />
 				</header>
 
 				<Banner featured={featured} own={own} total={total} />

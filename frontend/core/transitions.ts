@@ -58,6 +58,9 @@ function rank(path: string): number | null {
 	if (path.startsWith('/steamupgraded/library')) return 0;
 	if (path.startsWith('/steamupgraded/app/') || path.startsWith('/steamupgraded/album/') || path.startsWith('/steamupgraded/captures')) return 0.5;
 	if (path.startsWith('/steamupgraded/store')) return 1;
+	// liste de souhaits et panier : sous-pages du Magasin, avant la page de vente
+	if (path.startsWith('/steamupgraded/souhaits')) return 1.2;
+	if (path.startsWith('/steamupgraded/panier')) return 1.3;
 	// page de vente : juste après le Magasin (on y entre en glissant)
 	if (path.startsWith('/steamupgraded/vente')) return 1.5;
 	if (path.startsWith('/browser')) return 2;
@@ -65,6 +68,9 @@ function rank(path: string): number | null {
 	if (path.startsWith('/steamupgraded/downloads')) return 4;
 	return null;
 }
+
+/** Pages du Magasin qui partagent le sélecteur Promos / Liste de souhaits / Panier. */
+const STORE_TABS = /^\/steamupgraded\/(store|souhaits|panier)/;
 
 /** Appid d'une fiche ou d'une bande-son. */
 function detailId(path: string): string | null {
@@ -490,6 +496,12 @@ function enterNow(root: HTMLElement, to: string, ready: () => void) {
 		clone.style.transformOrigin = origin;
 		anims.push(clone.animate([{ transform: 'none', opacity: 1 }, { opacity: 1, offset: 0.65 }, { transform: `scale(${s})`, opacity: 0 }], { duration: ms(360), easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' }));
 		anims.push(root.animate([{ opacity: 0.25, transform: 'scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: ms(380), easing: 'ease-out', fill: 'backwards' }));
+	} else if (STORE_TABS.test(from) && STORE_TABS.test(to)) {
+		// Promos, liste de souhaits, panier : fondu sur place, l'en-tête ne bouge pas et la pastille
+		// du sélecteur glisse vers le nouvel onglet (StoreTabs) ; celle de la page quittée disparaît tout de suite
+		clone.querySelectorAll<HTMLElement>('.sps-tabs-ind').forEach((el) => (el.style.opacity = '0'));
+		anims.push(root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms(240), easing: 'ease-out', fill: 'backwards' }));
+		anims.push(clone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms(160), easing: 'ease-in', fill: 'forwards' }));
 	} else if (rt !== rf) {
 		// Glissement selon le sens des onglets
 		const d = rt > rf ? 1 : -1;

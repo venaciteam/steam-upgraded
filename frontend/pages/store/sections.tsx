@@ -1,8 +1,10 @@
 // Sections de la page Magasin : bandeau, liste de souhaits en promo, promos du moment.
-import { ReactNode } from 'react';
-import { openSteamWeb, openStorePage } from '../../core/steam';
-import { Async, capitalize, Deal, endDate, money, Featured, int, Owned, plural, saleSubject, Spotlight, Wishlist } from './data';
-import { Capsule, DiscountBadge, HistoricalLowBadge, IconExternal, IconTag, OwnedBadge, Prices, Review } from './ui';
+import { ReactNode, useLayoutEffect, useRef } from 'react';
+import { beforeNextFrame } from '../../core/transitions';
+import { navigate, openSteamWeb, openStorePage, ROUTES } from '../../core/steam';
+import { Async, capitalize, Deal, endDate, money, Featured, int, loadWishlist, mySteamId, Owned, plural, saleSubject, Spotlight, useAsync, Wishlist } from './data';
+import { useCart } from './cart';
+import { Capsule, CountBadge, DiscountBadge, HistoricalLowBadge, IconCart, IconExternal, IconHeart, IconTag, OwnedBadge, Prices, Review } from './ui';
 
 export function SectionHead({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
 	return (
@@ -183,8 +185,8 @@ export function WishlistSection({ wishlist, onSale, own, retry }: { wishlist: As
 				}
 			>
 				{wl && !wl.empty && (
-					<a role="button" tabIndex={0} onClick={() => openSteamWeb('https://store.steampowered.com/wishlist/')}>
-						Ouvrir ma liste de souhaits
+					<a role="button" tabIndex={0} onClick={() => navigate(ROUTES.wishlist)}>
+						Toute la liste ({int(wl.count)})
 					</a>
 				)}
 			</SectionHead>
@@ -247,6 +249,70 @@ export function DealRow({ deal, owned }: { deal: Deal; owned?: Owned }) {
 	);
 }
 
+type StoreTab = 'store' | 'wishlist' | 'cart';
+
+// Onglet du sélecteur affiché sur la page précédente : la pastille part de là et glisse jusqu'au nouvel onglet
+let lastTab: StoreTab | null = null;
+
+/**
+ * Sélecteur Promos / Liste de souhaits / Panier, tout à droite de l'en-tête des trois pages (donc toujours au même endroit).
+ * Sa pastille glisse d'un onglet à l'autre d'une page à la suivante ; la page change en fondu (core/transitions.ts).
+ */
+export function StoreTabs({ current }: { current: StoreTab }) {
+	const [wl] = useAsync((force) => loadWishlist(mySteamId(), force), []);
+	const { cart } = useCart();
+	const tabs: { id: StoreTab; label: string; icon?: ReactNode; count?: number; go: string }[] = [
+		{ id: 'store', label: 'Promos', go: ROUTES.store },
+		{ id: 'wishlist', label: 'Liste de souhaits', icon: <IconHeart />, count: wl.data?.count, go: ROUTES.wishlist },
+		{ id: 'cart', label: 'Panier', icon: <IconCart />, count: cart?.lines.length, go: ROUTES.cart },
+	];
+	const index = tabs.findIndex((t) => t.id === current);
+	const navRef = useRef<HTMLElement>(null);
+	const indRef = useRef<HTMLSpanElement>(null);
+	useLayoutEffect(() => {
+		const nav = navRef.current;
+		const ind = indRef.current;
+		if (!nav || !ind) return undefined;
+		const place = (i: number) => {
+			const btn = nav.children[i + 1] as HTMLElement | undefined;
+			if (!btn) return;
+			ind.style.transform = `translateX(${btn.offsetLeft}px)`;
+			ind.style.width = `${btn.offsetWidth}px`;
+			ind.style.opacity = '1';
+		};
+		const from = lastTab ? tabs.findIndex((t) => t.id === lastTab) : -1;
+		lastTab = current;
+		// Juste avant l'image suivante, pas pendant le changement de page (mise en page forcée, voir core/transitions.ts)
+		const win = nav.ownerDocument.defaultView;
+		const stop = beforeNextFrame(win, () => {
+			place(from >= 0 ? from : index);
+			beforeNextFrame(win, () => {
+				nav.classList.add('sps-tabs--ready');
+				place(index);
+			});
+		});
+		const ro = win ? new (win as any).ResizeObserver(() => place(index)) : null;
+		ro?.observe(nav);
+		return () => {
+			stop();
+			ro?.disconnect();
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [index]);
+	return (
+		<nav aria-label="Pages du magasin" className="sps-tabs" ref={navRef}>
+			<span className="sps-tabs-ind" ref={indRef} aria-hidden="true" />
+			{tabs.map((t) => (
+				<button key={t.id} type="button" aria-current={t.id === current ? 'page' : undefined} onClick={() => t.id !== current && navigate(t.go)}>
+					{t.icon}
+					{t.label}
+					{t.count != null && <CountBadge n={t.count} strong={t.id === 'cart' && t.count > 0} />}
+				</button>
+			))}
+		</nav>
+	);
+}
+
 export function OpenFullStore() {
 	return (
 		<button type="button" className="sp-btn" onClick={() => openSteamWeb('https://store.steampowered.com/')} style={{ alignItems: 'center' }}>
@@ -257,6 +323,8 @@ export function OpenFullStore() {
 }
 
 export const STORE_CSS = `
+/* Les pages à sélecteur gardent la place de la barre de défilement : le sélecteur ne bouge pas d'une page à l'autre */
+.sps-page{scrollbar-gutter:stable;}
 /* theme.ts force align-items:stretch sur les boutons de .sp-root */
 .sps-page button{align-items:center;}
 .sps-page button.sps-card{align-items:stretch;}
@@ -266,4 +334,13 @@ export const STORE_CSS = `
 .sps-card:hover,.sps-card:focus-visible{border-color:var(--sp-accent) !important;box-shadow:0 0 0 1px var(--sp-accent);}
 .sps-page button.sps-hover:not(.sps-row):not(.sps-card):hover{border-color:var(--sp-accent) !important;box-shadow:0 0 0 1px var(--sp-accent);}
 .sps-page button:focus-visible{outline:2px solid var(--sp-accent);outline-offset:2px;}
+/* Sélecteur Promos / Liste de souhaits / Panier : pastille glissante (StoreTabs) */
+.sps-tabs{position:relative;display:flex;gap:2px;padding:4px;border-radius:var(--sp-r-md);background:var(--sp-surface);border:1px solid var(--sp-line);}
+/* même graisse partout : la largeur des onglets ne change pas d'une page à l'autre, la pastille tombe juste */
+.sps-page .sps-tabs button{position:relative;z-index:1;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px 0 14px;border:0;border-radius:var(--sp-r-sm);background:transparent;color:var(--sp-muted);font-weight:700;white-space:nowrap;}
+.sps-page .sps-tabs button:hover{color:var(--sp-text);}
+.sps-page .sps-tabs button[aria-current]{color:var(--sp-text);cursor:default;}
+.sps-tabs-ind{position:absolute;top:4px;left:0;height:36px;border-radius:var(--sp-r-sm);background:var(--sp-surface2);box-shadow:inset 0 0 0 1px var(--sp-accent);opacity:0;}
+.sps-tabs--ready .sps-tabs-ind{transition:transform .26s cubic-bezier(.2,.8,.2,1),width .26s cubic-bezier(.2,.8,.2,1),opacity .2s;}
+@media (prefers-reduced-motion:reduce){.sps-tabs--ready .sps-tabs-ind{transition:opacity .14s;}}
 `;

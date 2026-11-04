@@ -19,6 +19,8 @@ export type Settings = {
 	/** Thème de Big Picture, indépendant du bureau (OLED par défaut : écran de télévision). */
 	bpTheme: 'sombre' | 'oled';
 	presenceReturnMinutes: number;
+	/** Version proposée que la personne a choisi d'ignorer (Paramètres › Mises à jour). */
+	updateSkip: string;
 };
 
 export const DEFAULTS: Settings = {
@@ -38,6 +40,7 @@ export const DEFAULTS: Settings = {
 	replaceBigPicture: true,
 	bpTheme: 'oled',
 	presenceReturnMinutes: 0,
+	updateSkip: '',
 };
 
 let current: Settings = { ...DEFAULTS };

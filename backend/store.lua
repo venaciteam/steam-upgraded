@@ -91,8 +91,13 @@ local function normalize_item(it, names)
     local bpo = it.best_purchase_option
     if type(bpo) == "table" then
         out.final = num(bpo.final_price_in_cents)
-        out.original = num(bpo.original_price_in_cents) or out.final
-        out.discount = num(bpo.discount_pct) or 0
+        -- un lot affiche sa réduction de lot à part
+        out.original = num(bpo.original_price_in_cents) or num(bpo.price_before_bundle_discount) or out.final
+        out.discount = num(bpo.discount_pct) or num(bpo.bundle_discount_pct) or 0
+        -- ce qu'on met au panier pour acheter le jeu (édition de base en général)
+        out.packageid = num(bpo.packageid)
+        out.bundleid = num(bpo.bundleid)
+        out.games = num(bpo.included_game_count)
         out.lowestRecent = num(bpo.lowest_recent_price_in_cents)
         if type(bpo.active_discounts) == "table" then
             for _, d in ipairs(bpo.active_discounts) do
@@ -102,6 +107,17 @@ local function normalize_item(it, names)
         end
     end
     if it.is_free == true then out.free = true end
+    local rel = it.release
+    if type(rel) == "table" then
+        out.release = num(rel.steam_release_date) or num(rel.original_release_date)
+        if rel.is_coming_soon == true then
+            out.comingSoon = true
+            out.releaseText = str(rel.custom_release_date_message)
+            -- date approximative (« 2027 », « T2 2027 ») : on n'affiche que l'année
+            local disp = str(rel.coming_soon_display)
+            if out.release and disp and disp ~= "date_full" then out.releaseYearOnly = true end
+        end
+    end
     -- Les images récentes ont un chemin haché : header.jpg « nu » renvoie 404, on suit les assets.
     local as = it.assets
     if type(as) == "table" and type(as.asset_url_format) == "string" and type(as.header) == "string" then
@@ -130,8 +146,8 @@ local function normalize_item(it, names)
     return out
 end
 
--- Renvoie appid -> élément normalisé (par lots de 100).
-local function get_items(appids)
+-- Renvoie appid -> élément normalisé (par lots de 100). `release` : dates de sortie en plus.
+local function get_items(appids, release)
     local result, names, failed = {}, get_tag_names(), nil
     for i = 1, #appids, 100 do
         local ids = {}
@@ -139,7 +155,7 @@ local function get_items(appids)
         local input = encode({
             ids = ids,
             context = { language = LANG, country_code = CC },
-            data_request = { include_tag_count = 6, include_reviews = true, include_assets = true, include_release = false, include_basic_info = false },
+            data_request = { include_tag_count = 6, include_reviews = true, include_assets = true, include_release = release == true, include_basic_info = false },
         })
         local data, err = fetch_json("https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=" .. urlencode(input))
         local items = data and type(data.response) == "table" and data.response.store_items
@@ -286,7 +302,7 @@ function sp_store_wishlist(steamid)
             meta[id] = { priority = num(w.priority), added = num(w.date_added) }
         end
     end
-    local items, failed = get_items(ids)
+    local items, failed = get_items(ids, true)
     local source = "GetItems"
     if failed and next(items) == nil then
         items = prices_from_appdetails(ids)
@@ -300,6 +316,61 @@ function sp_store_wishlist(steamid)
         out[#out + 1] = it
     end
     return encode({ ok = true, empty = false, count = #ids, source = source, items = out })
+end
+
+-- ---------- Panier : noms, images et prix actuels des articles ----------
+
+-- Le panier lui-même est lu par le client Steam (pages/store/cart.ts) ; il ne donne que des numéros
+-- de paquets (packageid) ou de lots (bundleid). `json` : [{ "packageid": 1 }, { "bundleid": 2 }, …]
+---@ffi
+---@param json string
+---@return string
+function sp_store_cart_items(json)
+    local ok, list = pcall(cjson.decode, tostring(json or ""))
+    if not ok or type(list) ~= "table" then return encode({ ok = false, error = "liste illisible" }) end
+    local ids = {}
+    for _, v in ipairs(list) do
+        if type(v) == "table" then
+            local p, b = num(v.packageid), num(v.bundleid)
+            if p and p > 0 then ids[#ids + 1] = { packageid = p }
+            elseif b and b > 0 then ids[#ids + 1] = { bundleid = b } end
+        end
+        if #ids >= 100 then break end
+    end
+    if #ids == 0 then return encode({ ok = true, items = {} }) end
+    local data, err = fetch_json("https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=" .. urlencode(encode({
+        ids = ids,
+        context = { language = LANG, country_code = CC },
+        data_request = { include_assets = true },
+    })))
+    local items = data and type(data.response) == "table" and data.response.store_items
+    if type(items) ~= "table" then return encode({ ok = false, error = err or "GetItems indisponible" }) end
+    local out, noHeader = {}, {}
+    for _, it in ipairs(items) do
+        if num(it.success) == 1 then
+            local n = normalize_item(it, {})
+            local kind = num(it.item_type) == 2 and "b" or "p"
+            n.key = kind .. ":" .. tostring(num(it.id))
+            -- un paquet donne le jeu auquel il appartient ; un lot, ses jeux
+            n.appid = num(it.appid)
+            if not n.appid and type(it.included_appids) == "table" then n.appid = num(it.included_appids[1]) end
+            if kind == "b" and type(it.included_appids) == "table" then n.games = #it.included_appids end
+            n.packageid, n.bundleid = nil, nil
+            if not n.header and n.appid then noHeader[#noHeader + 1] = n end
+            out[#out + 1] = n
+        end
+    end
+    -- Paquets sans image (éditions anciennes) : celle du jeu
+    if #noHeader > 0 then
+        local apps = {}
+        for _, n in ipairs(noHeader) do apps[#apps + 1] = n.appid end
+        local byApp = get_items(apps)
+        for _, n in ipairs(noHeader) do
+            local a = byApp[n.appid]
+            if a then n.header = a.header end
+        end
+    end
+    return encode({ ok = true, items = out })
 end
 
 -- ---------- Mises en avant (offre du jour, évènements) ----------

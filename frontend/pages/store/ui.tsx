@@ -39,6 +39,51 @@ export const IconRefresh = () => (
 		<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
 	</svg>
 );
+export const IconHeart = ({ on = false, size = 16 }: { on?: boolean; size?: number }) => (
+	// var() ne marche pas dans un attribut SVG : couleurs en style
+	<svg width={size} height={size} viewBox="0 0 24 24" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none', fill: on ? 'currentColor' : 'none', stroke: 'currentColor' }}>
+		<path d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.9c0 5.6-7.5 10-7.5 10z" />
+	</svg>
+);
+export const IconCart = ({ size = 16 }: { size?: number }) => (
+	<svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...svg}>
+		<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6.2" />
+		<circle cx="9.5" cy="19.5" r="1.3" />
+		<circle cx="17" cy="19.5" r="1.3" />
+	</svg>
+);
+export const IconTrash = ({ size = 16 }: { size?: number }) => (
+	<svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...svg}>
+		<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5" />
+	</svg>
+);
+export const IconPlus = ({ size = 16 }: { size?: number }) => (
+	<svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...svg}>
+		<path d="M12 5v14M5 12h14" />
+	</svg>
+);
+export const IconGift = ({ size = 13 }: { size?: number }) => (
+	<svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...svg}>
+		<path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-2-4-6-3-5 0M12 7c2-4 6-3 5 0" />
+	</svg>
+);
+export const IconPerson = ({ size = 13 }: { size?: number }) => (
+	<svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...svg}>
+		<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0" />
+	</svg>
+);
+
+/** Petit compteur posé dans un bouton (liste de souhaits, panier). */
+export function CountBadge({ n, strong }: { n: number; strong?: boolean }) {
+	return (
+		<span
+			style={{ minWidth: 20, height: 20, padding: '0 6px', boxSizing: 'border-box', borderRadius: 10, fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: strong ? 'var(--sp-accent)' : 'var(--sp-bg)', color: strong ? 'var(--sp-accent-ink)' : 'var(--sp-text)' }}
+		>
+			{int(n)}
+		</span>
+	);
+}
+
 export const IconTag = () => (
 	<svg width={22} height={22} viewBox="0 0 24 24" aria-hidden="true" {...svg}>
 		<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0z" />
@@ -316,7 +361,9 @@ export const SORTS: { id: SortId; label: string }[] = [
 	{ id: 'reviews', label: 'Meilleurs avis' },
 ];
 
-export function SortMenu({ value, onChange }: { value: SortId; onChange: (s: SortId) => void }) {
+/** Menu de tri ; `options` remplace les tris des promos (liste de souhaits). */
+export function SortMenu<T extends string = SortId>({ value, onChange, options }: { value: T; onChange: (s: T) => void; options?: { id: T; label: string }[] }) {
+	const list = options || (SORTS as unknown as { id: T; label: string }[]);
 	const btn = useRef<HTMLButtonElement>(null);
 	const pop = useRef<HTMLDivElement>(null);
 	const { open, setOpen, pos, toggle } = usePopover(btn, pop);
@@ -326,14 +373,14 @@ export function SortMenu({ value, onChange }: { value: SortId; onChange: (s: Sor
 				<IconSort />
 				<span>
 					<span className="sp-muted">Trier : </span>
-					<b>{SORTS.find((s) => s.id === value)?.label}</b>
+					<b>{list.find((s) => s.id === value)?.label}</b>
 				</span>
 				<IconChevron />
 			</button>
 			{open && (
 				<Portal anchor={btn}>
 					<div ref={pop} className="sp-pop" role="menu" aria-label="Trier par" style={{ top: pos.top, right: pos.right, minWidth: 230 }}>
-						{SORTS.map((s) => (
+						{list.map((s) => (
 							<button
 								key={s.id}
 								type="button"

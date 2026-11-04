@@ -8,12 +8,15 @@ import { LibraryPage } from './pages/Library';
 import { GamePage } from './pages/Game';
 import { StorePage } from './pages/Store';
 import { StoreAppPage } from './pages/StoreApp';
+import { WishlistPage } from './pages/Wishlist';
+import { CartPage } from './pages/Cart';
 import { DownloadsPage } from './pages/Downloads';
 import { AlbumPage } from './pages/Album';
 import { CapturesPage } from './pages/Captures';
 import { initSteamSettingsRedirect } from './features/steamSettings';
 import { initChatSkin } from './features/chatSkin';
 import { initMediaRedirect } from './features/mediaRedirect';
+import { initUpdates } from './features/updates';
 import { BpHome } from './bigpicture/Home';
 import { BpLibrary } from './bigpicture/Library';
 import { BpGame } from './bigpicture/GamePage';
@@ -21,6 +24,8 @@ import { BpQuickMenu } from './bigpicture/QuickMenu';
 import { BpStoreBar } from './bigpicture/StoreBar';
 import { BpStore } from './bigpicture/Store';
 import { BpStoreApp } from './bigpicture/StoreApp';
+import { BpWishlist } from './bigpicture/Wishlist';
+import { BpCart } from './bigpicture/Cart';
 import { registerBpReskin } from './bigpicture/reskin';
 
 let started = false;
@@ -33,6 +38,8 @@ async function start() {
 	routerHook.addRoute('/steamupgraded/app/:appid', GamePage);
 	routerHook.addRoute(ROUTES.store, StorePage);
 	routerHook.addRoute('/steamupgraded/vente/:appid', StoreAppPage);
+	routerHook.addRoute(ROUTES.wishlist, WishlistPage);
+	routerHook.addRoute(ROUTES.cart, CartPage);
 	routerHook.addRoute(ROUTES.settings, SettingsPage);
 	routerHook.addRoute(ROUTES.downloads, DownloadsPage);
 	routerHook.addRoute('/steamupgraded/album/:appid', AlbumPage);
@@ -43,6 +50,8 @@ async function start() {
 	routerHook.addRoute(ROUTES.bpMenu, BpQuickMenu);
 	routerHook.addRoute(ROUTES.bpStore, BpStore);
 	routerHook.addRoute('/steamupgraded/bp/vente/:appid', BpStoreApp);
+	routerHook.addRoute(ROUTES.bpWishlist, BpWishlist);
+	routerHook.addRoute(ROUTES.bpCart, BpCart);
 	registerBpReskin();
 	routerHook.addGlobalComponent('steam-upgraded-shell', Shell, 7);
 	// Big Picture : notre en-tête au-dessus du magasin natif
@@ -52,6 +61,7 @@ async function start() {
 	initSteamSettingsRedirect();
 	initChatSkin();
 	initMediaRedirect();
+	initUpdates();
 }
 
 export default definePlugin(() => {

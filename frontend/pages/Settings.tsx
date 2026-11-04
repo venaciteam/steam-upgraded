@@ -6,6 +6,7 @@ import { NATIVE_GROUPS, RootMenu, runNativeMenuItem } from '../core/nativeMenu';
 import { onSteamPageRequested, SteamSettingsPanel, takeRequestedSteamPage, useSteamPages } from '../features/steamSettings';
 import { SgdbWelcome } from '../features/sgdb/Welcome';
 import { UpdatesPanel } from '../features/uninstall';
+import { takeUpdatesPage, useUpdateAvailable } from '../features/updates';
 import { usePageTransition } from '../core/transitions';
 import { presenceState, schedulePresenceReturn } from '../core/steam';
 
@@ -37,7 +38,7 @@ function Section({ id, title, sub, children }: { id: string; title: string; sub?
 	);
 }
 
-const CATS = ['Apparence', 'Présence', 'Bibliothèque', 'SteamGridDB', 'Actions de Steam', 'Mises à jour'] as const;
+const CATS = ['Apparence', 'Présence', 'Bibliothèque', 'Actions de Steam', 'SteamGridDB', 'Mises à jour'] as const;
 
 function NativeActions() {
 	const [busy, setBusy] = useState('');
@@ -69,10 +70,11 @@ function NativeActions() {
 
 const STEAM = 'steam:';
 
-function NavItem({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+function NavItem({ label, on, onClick, dot }: { label: string; on: boolean; onClick: () => void; dot?: boolean }) {
 	return (
 		<button type="button" onClick={onClick} aria-current={on ? 'page' : undefined} style={{ textAlign: 'left', padding: '9px 14px', border: 0, borderRadius: 'var(--sp-r-sm)', background: on ? 'var(--sp-surface2)' : 'transparent', fontWeight: on ? 700 : 500, color: on ? 'var(--sp-text)' : 'var(--sp-muted)' }}>
 			{label}
+			{dot && <span className="sp-update-dot" aria-label="mise à jour disponible" />}
 		</button>
 	);
 }
@@ -85,11 +87,12 @@ export function SettingsPage() {
 	// catégorie : une des nôtres, ou « steam:<route> » pour une page native
 	const [cat, setCat] = useState<string>(() => {
 		const r = takeRequestedSteamPage();
-		return r ? STEAM + r : 'Apparence';
+		return r ? STEAM + r : takeUpdatesPage() ? 'Mises à jour' : 'Apparence';
 	});
 	const [key, setKey] = useState(s.sgdbKey);
 	const [welcome, setWelcome] = useState(false);
 	const steamPages = useSteamPages();
+	const update = useUpdateAvailable();
 	const oled = s.theme === 'oled';
 	const steamRoute = cat.startsWith(STEAM) ? cat.slice(STEAM.length) : '';
 
@@ -108,7 +111,7 @@ export function SettingsPage() {
 				<nav aria-label="Catégories de paramètres" style={{ width: 240, flex: 'none', padding: '20px 16px 32px', borderRight: '1px solid var(--sp-line)', display: 'flex', flexDirection: 'column', gap: 2 }}>
 					<span className="sp-label" style={groupLabel(6)}>Steam Upgraded</span>
 					{CATS.map((c) => (
-						<NavItem key={c} label={c} on={cat === c} onClick={() => setCat(c)} />
+						<NavItem key={c} label={c} on={cat === c} onClick={() => setCat(c)} dot={update && c === 'Mises à jour'} />
 					))}
 					{steamPages.length > 0 && <span className="sp-label" style={groupLabel(22)}>Steam</span>}
 					{steamPages.map((p, i) =>

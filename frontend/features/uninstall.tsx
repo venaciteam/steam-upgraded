@@ -1,7 +1,8 @@
-// Paramètres › Mises à jour : version installée et désinstallation de Steam Upgraded depuis Steam.
+// Paramètres › Mises à jour : version installée et mises à jour (updates.tsx), désinstallation de Steam Upgraded depuis Steam.
 // Ordre : fichier .star supprimé par notre backend, réglages effacés (sauf choix contraire), plugin désactivé
 // dans Millennium (son backend s'arrête), puis interface rechargée sans nous. Millennium reste installé.
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { UpdateSections } from './updates';
 
 const w = window as any;
 export const PLUGIN_ID = 'com.venacity.steamupgraded';
@@ -11,7 +12,7 @@ const core = (method: string, args?: any) => w.Millennium.callServerMethod('core
 const parse = (raw: any) => (typeof raw === 'string' ? JSON.parse(raw) : raw);
 
 /** Notre plugin tel que Millennium le voit (version, chemin du .star). */
-async function selfInfo(): Promise<{ version: string; path: string } | null> {
+export async function selfInfo(): Promise<{ version: string; path: string } | null> {
 	try {
 		const list = parse(await core('Core_FindAllPlugins'));
 		const me = (Array.isArray(list) ? list : []).find((p: any) => p?.data?.name === PLUGIN_ID);
@@ -36,7 +37,11 @@ export async function uninstallPlugin(keepSettings: boolean): Promise<void> {
 		}
 	}
 	await core('Core_ChangePluginStatus', { pluginJson: JSON.stringify([{ plugin_name: PLUGIN_ID, enabled: false }]) });
-	// Rechargement de l'interface sur son adresse de démarrage (voir core/history.ts : une adresse /routes/… ne se recharge pas).
+	restartInterface();
+}
+
+/** Recharge l'interface sur son adresse de démarrage (voir core/history.ts : une adresse /routes/… ne se recharge pas). */
+export function restartInterface() {
 	try {
 		if (w.location?.pathname?.startsWith('/routes/')) w.history.replaceState(w.history.state, '', w.localStorage?.getItem(START_KEY) || '/index.html');
 	} catch {}
@@ -87,16 +92,10 @@ function Confirm({ onClose }: { onClose: () => void }) {
 
 /** Contenu de Paramètres › Mises à jour. */
 export function UpdatesPanel({ Section }: { Section: (p: { id: string; title: string; sub?: string; children: any }) => any }) {
-	const [version, setVersion] = useState('');
 	const [confirm, setConfirm] = useState(false);
-	useEffect(() => {
-		selfInfo().then((me) => me && setVersion(me.version));
-	}, []);
 	return (
 		<>
-			<Section id="h-version" title={version ? `Version installée : ${version}` : 'Version installée'} sub="La recherche de mises à jour arrivera avec la publication du projet sur GitHub.">
-				{null}
-			</Section>
+			<UpdateSections Section={Section} />
 			<Section id="h-uninstall" title="Désinstaller Steam Upgraded" sub="Rend à Steam son interface d'origine. Vos jeux, votre compte et les visuels déjà appliqués restent.">
 				<div>
 					<button type="button" className="sp-btn" onClick={() => setConfirm(true)} style={{ border: '1px solid var(--sp-busy)', background: 'transparent', color: 'var(--sp-busy)', fontWeight: 700 }}>

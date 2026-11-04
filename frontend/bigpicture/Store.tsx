@@ -1,6 +1,6 @@
 // Big Picture › Magasin : bandeau de l'évènement Steam en cours, liste de souhaits en promo, promos du moment.
 // Mêmes données que le Magasin du bureau. A ouvre notre page de vente du jeu (StoreApp.tsx),
-// X ouvre tout le magasin de Steam (sous notre en-tête), Y change le tri. Lecture seule : aucun achat, aucune modification de la liste de souhaits.
+// X ouvre tout le magasin de Steam (sous notre en-tête), Y change le tri. À droite du bandeau : liste de souhaits et panier (Wishlist.tsx, Cart.tsx).
 import { useMemo, useState } from 'react';
 import { DialogButton, Focusable } from 'millennium';
 import { capitalize, money, moneyRound, priceSteps, filterDeals, int, loadFeatured, loadWishlist, mySteamId, ownershipMap, PAGE, plural, promoEndWhen, reviewScore, reviewTone, saleSubject, useAsync, useSpecials, wishlistOnSale } from '../pages/store/data';
@@ -11,6 +11,7 @@ import { useSettings } from '../core/settings';
 import { bpNavigate, bpWindow, myAccountId, ROUTES } from '../core/steam';
 import { BpFrame, goBackBp, MemberAvatar } from './Frame';
 import { openSteamWebBp } from './StoreBar';
+import { BpStoreLink } from './storeLinks';
 
 /** Filtres rapides ; « Moins de … » suit la devise du magasin (absent pour une devise non prévue). */
 function pills(): { id: string; label: string; filters: Filters }[] {
@@ -38,7 +39,7 @@ function promoEnd(rt?: number): string {
 	return when ? `Fin de la promo ${when}` : '';
 }
 
-function DiscountTag({ pct, big }: { pct: number; big?: boolean }) {
+export function DiscountTag({ pct, big }: { pct: number; big?: boolean }) {
 	return (
 		<span style={{ padding: big ? '6px 10px' : '4px 8px', borderRadius: big ? 10 : 8, background: 'var(--sp-deal)', color: 'var(--sp-deal-ink)', fontSize: big ? 20 : 18, fontWeight: 800, flex: 'none' }}>
 			−{pct}&#8239;%
@@ -67,7 +68,7 @@ function Banner({ featured, total, onSale, wl }: { featured?: Featured; total: n
 		<section
 			aria-label="Évènement en cours"
 			data-reveal-block
-			style={{ margin: '34px 64px 0', display: 'flex', alignItems: 'center', gap: 40, padding: '30px 36px', borderRadius: 30, border: '2px solid var(--sp-deal)', background: s.bpTheme === 'oled' ? 'var(--sp-bg)' : 'color-mix(in srgb, var(--sp-deal) 9%, var(--sp-bg))' }}
+			style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 40, padding: '30px 36px', borderRadius: 30, border: '2px solid var(--sp-deal)', background: s.bpTheme === 'oled' ? 'var(--sp-bg)' : 'color-mix(in srgb, var(--sp-deal) 9%, var(--sp-bg))' }}
 		>
 			<div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
 				<span className="spbp-label" style={{ color: 'var(--sp-deal)', letterSpacing: '0.12em' }}>
@@ -135,7 +136,7 @@ function WishCard({ d, owned, focus }: { d: Deal; owned?: Owned; focus: boolean 
 	);
 }
 
-function Notice({ children }: { children: any }) {
+export function Notice({ children }: { children: any }) {
 	return <p style={{ margin: '0 64px', padding: '26px 30px', borderRadius: 26, background: 'var(--sp-surface)', border: '1px solid var(--sp-line)', fontSize: 22, color: 'var(--sp-muted)' }}>{children}</p>;
 }
 
@@ -250,7 +251,13 @@ export function BpStore() {
 				</span>
 			}
 		>
-			<Banner featured={featured.data} total={total} onSale={onSale} wl={wl} />
+			<Focusable flow-children="row" style={{ margin: '34px 64px 0', display: 'flex', gap: 24, alignItems: 'stretch' }}>
+				<Banner featured={featured.data} total={total} onSale={onSale} wl={wl} />
+				<Focusable flow-children="column" aria-label="Votre magasin" style={{ width: 330, flex: 'none', display: 'flex', flexDirection: 'column', gap: 16 }}>
+					<BpStoreLink to="wishlist" />
+					<BpStoreLink to="cart" />
+				</Focusable>
+			</Focusable>
 
 			<WishlistRow wishlist={wishlist} onSale={onSale} own={own} focusKey={focusKey} />
 
