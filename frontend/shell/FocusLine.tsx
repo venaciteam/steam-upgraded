@@ -3,6 +3,8 @@
 // et suivait un état de focus que Steam perd parfois (au démarrage, quand sa page d'accueil se ferme).
 // Ici, le focus est relu en continu sur toutes les fenêtres de Steam (menus et dialogues compris), et le liseré
 // s'éteint et se rallume comme un néon.
+// En fenêtré (ni agrandie ni plein écran), Windows 11 dessine sa bordure de fenêtre par-dessus le haut de la page
+// (1 pixel physique par 100 % d'échelle, 2 à 175 %) : elle recouvrait tout le liseré. Il est alors posé juste dessous.
 import { useEffect, useState } from 'react';
 
 const w = window as any;
@@ -33,9 +35,54 @@ function steamHasFocus(main: Window): boolean {
 	return false;
 }
 
+/** Vrai si la fenêtre est agrandie ou en plein écran (aucune bordure de Windows en haut). */
+async function edgeToEdge(win: Window): Promise<boolean> {
+	const sw = (win as any).SteamClient?.Window;
+	try {
+		const max = await new Promise<boolean>((ok) => {
+			const r = sw?.IsWindowMaximized?.((v: boolean) => ok(!!v));
+			if (r && typeof r.then === 'function') r.then((v: boolean) => ok(!!v));
+			else if (!sw?.IsWindowMaximized) ok(false);
+			setTimeout(() => ok(false), 1000);
+		});
+		if (max) return true;
+	} catch {}
+	// Plein écran (F11) ou repli : la fenêtre couvre tout l'écran
+	return win.outerWidth >= win.screen.width && win.outerHeight >= win.screen.height;
+}
+
+/** Hauteur de la bordure de Windows en pixels CSS : un pixel physique par 100 % d'échelle, arrondi au-dessus. */
+const frameInset = (win: Window) => {
+	const dpr = win.devicePixelRatio || 1;
+	return Math.ceil(dpr) / dpr;
+};
+
 export function FocusLine({ win }: { win: Window }) {
 	// null : pas encore mesuré (aucune animation d'extinction au premier rendu)
 	const [on, setOn] = useState<boolean | null>(null);
+	const [inset, setInset] = useState(0);
+
+	useEffect(() => {
+		let alive = true;
+		let timer: any = 0;
+		const measure = () => {
+			clearTimeout(timer);
+			// Après la fin de l'agrandissement ou de la restauration
+			timer = setTimeout(async () => {
+				// Bordure propre à Windows : rien à décaler sur macOS ni sous Linux
+				if (!/Win/i.test(win.navigator.platform || '')) return;
+				const full = await edgeToEdge(win);
+				if (alive) setInset(full ? 0 : frameInset(win));
+			}, 150);
+		};
+		measure();
+		win.addEventListener('resize', measure);
+		return () => {
+			alive = false;
+			clearTimeout(timer);
+			win.removeEventListener('resize', measure);
+		};
+	}, [win]);
 
 	useEffect(() => {
 		let misses = 0;
@@ -63,7 +110,7 @@ export function FocusLine({ win }: { win: Window }) {
 	return (
 		<>
 			<style>{CSS}</style>
-			<div aria-hidden="true" className={`sp-focusline${on === true ? ' sp-focusline--on' : on === false ? ' sp-focusline--off' : ''}`} />
+			<div aria-hidden="true" style={inset ? { top: `${inset}px` } : undefined} className={`sp-focusline${on === true ? ' sp-focusline--on' : on === false ? ' sp-focusline--off' : ''}`} />
 		</>
 	);
 }

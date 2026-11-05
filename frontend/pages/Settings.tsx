@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ACCENTS, FONDS } from '../core/theme';
 import { getSettings, setSetting, Settings as S, useSettings } from '../core/settings';
-import { NATIVE_GROUPS, RootMenu, runNativeMenuItem } from '../core/nativeMenu';
+import { NATIVE_GROUPS, RootMenu, canRunNativeMenuItem, hasNativeMenuBar, runNativeMenuItem } from '../core/nativeMenu';
 import { onSteamPageRequested, SteamSettingsPanel, takeRequestedSteamPage, useSteamPages } from '../features/steamSettings';
 import { SgdbWelcome } from '../features/sgdb/Welcome';
 import { UpdatesPanel } from '../features/uninstall';
@@ -50,9 +50,13 @@ function NativeActions() {
 		setBusy('');
 		if (!ok) setMissing(item);
 	};
+	// macOS : seules les entrées que Steam relie à une adresse steam:// ; les autres restent dans la barre de menus du système
+	const inPage = hasNativeMenuBar();
+	const groups = NATIVE_GROUPS.map((g) => ({ ...g, items: g.items.filter(canRunNativeMenuItem) })).filter((g) => g.items.length);
 	return (
 		<>
-			{NATIVE_GROUPS.map((g) => (
+			{!inPage && <p className="sp-muted">Sur Mac, les autres actions de Steam sont dans la barre de menus du système (menus Steam, Afficher, Contacts, Jeux, Aide).</p>}
+			{groups.map((g) => (
 				<Section key={g.title} id={`h-native-${g.menu}`} title={g.title}>
 					<div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
 						{g.items.map((it) => (
@@ -221,7 +225,7 @@ export function SettingsPage() {
 								</div>
 							</Section>
 
-							<Section id="h-hdr" title="HDR" sub="Nécessite le HDR activé dans Windows. Rien ne change sur un écran SDR.">
+							<Section id="h-hdr" title="HDR" sub="Nécessite le HDR activé dans les réglages d'affichage de l'ordinateur. Rien ne change sur un écran SDR.">
 								<div>
 									<Toggle k="hdrWide" label="Couleurs étendues et images HDR" sub="Accents en Display P3 et visuels HDR affichés sans être écrasés" />
 									<Toggle k="hdrHalo" label="Luminosité HDR maximale pour les images" sub="Les jaquettes HDR peuvent dépasser le blanc standard" />

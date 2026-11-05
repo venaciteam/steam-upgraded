@@ -1,11 +1,13 @@
 // Fiche d'un jeu : /steamupgraded/app/:appid
 import { useEffect, useState } from 'react';
+import { PlayControl } from './game/PlayControl';
+import { installedHere } from '../core/machines';
 import type { CSSProperties } from 'react';
-import { heroUrl, lenderOf, logoUrl, openProperties, openStorePage, playOrInstall } from '../core/steam';
+import { heroUrl, lenderOf, logoUrl, openProperties, openStorePage } from '../core/steam';
 import { useSettings } from '../core/settings';
 import { useArt } from '../core/art';
 import { openArtworkDialog } from '../features/sgdb';
-import { heroCandidates, isShortcut, liveName, logoCandidates, primaryState, useAchievements, useFriendsWithGame, useGame, useLenders, usePlaytimeLog, useRouteAppId } from './game/data';
+import { heroCandidates, isShortcut, liveName, logoCandidates, useAchievements, useFriendsWithGame, useGame, useLenders, usePlaytimeLog, useRouteAppId } from './game/data';
 import { CollectionsCard, FriendsCard, KeyCard, PlaytimeCard, ProgressCard } from './game/cards';
 import { usePageTransition } from '../core/transitions';
 
@@ -124,23 +126,12 @@ function Hero({ app, oled }: { app: any; oled: boolean }) {
 }
 
 function ActionBar({ app, details }: { app: any; details: any }) {
-	const st = primaryState(app);
 	const shortcut = isShortcut(app.appid);
 	const size = Number(details?.lDiskUsageBytes || app.size_on_disk || 0);
-	const status = app.installed ? `Installé${size ? ` · ${(size / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go` : ''}` : 'Non installé';
+	const status = installedHere(app) ? `Installé${size ? ` · ${(size / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go` : ''}` : 'Non installé';
 	return (
 		<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '20px 40px 0' }}>
-			<button
-				type="button"
-				className="sp-btn sp-btn--primary sp-btn--big"
-				disabled={st.disabled}
-				title={st.hint}
-				onClick={() => playOrInstall(app)}
-				style={st.disabled ? { ...btnAlign, opacity: 0.6, cursor: 'default' } : btnAlign}
-			>
-				{app.installed ? Icons.play : Icons.download}
-				{st.label}
-			</button>
+			<PlayControl app={app} big />
 			<button type="button" className="sp-btn" onClick={() => openProperties(app)} style={btnAlign}>
 				{Icons.gear}
 				Propriétés

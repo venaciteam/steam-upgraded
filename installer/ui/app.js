@@ -67,7 +67,7 @@ const sub = (text) => (document.getElementById('tb-sub').textContent = text);
 
 // ---------- Données ----------
 const millenniumNeeded = () => !st.det.millennium.installed || !st.det.millennium.compatible;
-const latestLabel = () => (st.latest ? `la version ${st.latest.version}` : 'la dernière version stable');
+const latestLabel = () => (st.latest ? `la version ${st.latest.version}` : 'la version testée');
 const pluginInstalled = () => !!st.det.plugin?.installed;
 
 async function refresh() {
@@ -121,7 +121,7 @@ function showVerif() {
   const m = d.millennium;
   const rows = [checkRow('ok', 'Steam', `Trouvé dans ${d.steam.path}`, 'Vérifié')];
   if (m.installed && m.compatible) rows.push(checkRow('ok', 'Millennium', `Version ${m.version}`, 'Vérifié'));
-  else if (m.installed) rows.push(checkRow('todo', 'Millennium', `Version ${m.version || 'inconnue'}, trop ancienne : ${latestLabel()} sera installée`, 'À mettre à jour'));
+  else if (m.installed) rows.push(checkRow('todo', 'Millennium', `Version ${m.version || 'inconnue'}, différente de celle testée avec Steam Upgraded : ${latestLabel()} sera installée`, 'À mettre à jour'));
   else rows.push(checkRow('todo', 'Millennium', `Absent : ${latestLabel()} sera installée`, 'À installer'));
   if (st.mode === 'repair') rows.push(checkRow('todo', 'Steam Upgraded', `Version ${d.version}, recopiée puis réactivée`, 'À réparer'));
   else rows.push(checkRow('todo', 'Steam Upgraded', `Version ${d.version}, installée puis activée`, 'À installer'));
@@ -134,7 +134,7 @@ function showVerif() {
       <div class="list">${rows.join('')}</div>
       ${need ? `<button type="button" class="chk" role="checkbox" aria-checked="${st.consentMillennium}" id="consent">
         <span class="box" aria-hidden="true">${ICON.check}</span>
-        <span class="row-t"><span class="row-l">${m.installed ? 'Mettre à jour Millennium, nécessaire à Steam Upgraded' : 'Installer Millennium, nécessaire à Steam Upgraded'}</span><span class="row-d">Projet libre de Steam Homebrew, téléchargé depuis ses publications officielles sur GitHub, empreinte vérifiée.</span></span>
+        <span class="row-t"><span class="row-l">${m.installed ? 'Remplacer Millennium par la version testée avec Steam Upgraded' : 'Installer Millennium, nécessaire à Steam Upgraded'}</span><span class="row-d">Projet libre de Steam Homebrew, téléchargé depuis ses publications officielles sur GitHub, empreinte vérifiée.</span></span>
       </button>` : ''}
     </div>
     <div class="foot">
@@ -385,6 +385,7 @@ function showDone() {
       <span class="big rd" aria-hidden="true">${ICON.bigOk}</span>
       <h1 class="h1">${st.mode === 'repair' ? 'Steam Upgraded est réparé' : 'Steam Upgraded est installé'}</h1>
       <p class="p">Steam redémarre avec sa nouvelle interface.${withKey ? ' La clé SteamGridDB est enregistrée : sur la fiche d\'un jeu, l\'icône « Personnaliser les visuels » ouvre le choix des jaquettes, bannières et logos.' : ''}</p>
+      ${st.det.platform === 'macos' ? `<div class="note"><b>Sur Mac, ouvrez désormais Steam avec l'app « Steam Upgraded »</b>, dans le dossier Applications : c'est elle qui charge Steam Upgraded. L'app Steam d'origine ouvre Steam sans. Pensez à la mettre dans le Dock à la place de Steam.</div>` : ''}
       <div class="note">Pour le retirer plus tard : Paramètres › Mises à jour › Désinstaller, dans Steam, ou relancez cet installeur.</div>
     </div>
     <div class="foot"><span class="sp"></span><button type="button" class="btn-p" id="end">Terminer</button></div>`, (r) => on(r, '#end', () => win.close()));

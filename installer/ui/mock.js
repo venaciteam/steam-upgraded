@@ -9,6 +9,8 @@ if (!window.__TAURI__) {
   const installed = scenario === 'installe';
   const det = {
     simulation: `aperçu ${scenario}`,
+    platform: new URLSearchParams(location.search).get('plateforme') === 'macos' ? 'macos' : 'windows',
+    launcher: null,
     version: '0.1.0',
     steam: { found: scenario !== 'sans-steam', path: 'C:\\Program Files (x86)\\Steam', running: !installed },
     millennium: {
@@ -16,14 +18,14 @@ if (!window.__TAURI__) {
       version: installed ? '3.6.2' : scenario === 'ancien' ? '3.5.0' : null,
       compatible: installed,
       by_installer: installed,
-      min_version: '3.6.0'
+      min_version: '3.6.2'
     },
     plugin: { installed, enabled: installed, version: installed ? '0.1.0' : null, has_sgdb_key: false }
   };
   const step = (id, state, detail = '') => emit('etape', { id, state, detail });
   const handlers = {
     detect: async () => JSON.parse(JSON.stringify(det)),
-    millennium_latest: async () => { await wait(300); if (scenario === 'erreur-reseau') throw 'GitHub ne répond pas.'; return { version: '3.6.2' }; },
+    millennium_latest: async () => { await wait(300); return { version: '3.6.2' }; },
     steam_running: async () => det.steam.running,
     open_url: async () => {},
     sgdb_check: async ({ key }) => { await wait(700); return key.length >= 20 ? 'ok' : 'refusee'; },

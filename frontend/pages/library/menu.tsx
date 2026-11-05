@@ -1,7 +1,8 @@
 // Menu contextuel d'un jeu (clic droit sur une jaquette ou une carte « Reprendre ») : le menu natif de Steam,
 // habillé (theme.ts, .sp-mi), avec en-tête, icônes et deux sous-menus (collections, gestion).
 import { findModuleExport, Menu, MenuGroup, MenuItem, MenuSeparator, showContextMenu } from 'millennium';
-import { mainWindow, navigate, openProperties, openStorePage, playOrInstall, ROUTES } from '../../core/steam';
+import { gameActions } from '../../core/machines';
+import { mainWindow, navigate, openProperties, openStorePage, ROUTES } from '../../core/steam';
 import { openArtworkDialog, resetArtwork } from '../../features/sgdb';
 import { isShortcut } from '../game/data';
 import { formatBigHours, type Game } from './data';
@@ -11,6 +12,9 @@ const w = window as any;
 const ICONS = {
 	play: 'M7 4.5v15l12-7.5z',
 	install: 'M12 4v11M7 10.5l5 5 5-5M5 20h14',
+	stream: 'M3 6h18v11H3zM8 21h8M12 17v4M10 9.5v4l3.5-2z',
+	'remote-install': 'M3 6h18v11H3zM8 21h8M12 17v4M12 8v5.5M9.5 11l2.5 2.5 2.5-2.5',
+	unavailable: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8',
 	card: 'M4 5h16v14H4zM8 9h8M8 13h5',
 	store: 'M4 7h16l-1.5 11h-13zM9 7a3 3 0 0 1 6 0',
 	folder: 'M3 7h6l2 2h10v10H3zM12 12v4M10 14h4',
@@ -131,6 +135,7 @@ export function openGameMenu(e: any, g: Game, onChanged: () => void) {
 		}
 	};
 	const colls = collectionTargets(app);
+	const acts = gameActions(app);
 	try {
 		showContextMenu(
 			<Menu label={g.name}>
@@ -138,9 +143,12 @@ export function openGameMenu(e: any, g: Game, onChanged: () => void) {
 					<span className="sp-mi-title">{g.name}</span>
 					<span className="sp-mi-sub">{statusLine(g)}</span>
 				</div>
-				<MenuItem onSelected={() => playOrInstall(app)}>
-					<Item icon={g.installed ? 'play' : 'install'} label={g.installed ? 'Jouer' : 'Installer'} kind="play" />
-				</MenuItem>
+				{/* Jouer / installer / streamer : l'action principale, ou chaque possibilité s'il y a d'autres machines */}
+				{(acts.choices.length > 1 ? acts.choices : [acts.primary]).map((a, i) => (
+					<MenuItem key={`act${i}`} disabled={a.disabled} onSelected={() => !a.disabled && a.run()}>
+						<Item icon={a.kind} label={a.label} kind={a.disabled ? undefined : 'play'} />
+					</MenuItem>
+				))}
 				<MenuItem onSelected={() => navigate(ROUTES.app(g.appid))}>
 					<Item icon="card" label="Fiche du jeu" />
 				</MenuItem>

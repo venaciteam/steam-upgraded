@@ -83,7 +83,13 @@ function placeHosts(): Hosts {
 		nav.className = 'sp-nav-host';
 	}
 	const menus = bar.querySelector(':scope > .RootMenuBar');
-	if (menus && menus.nextElementSibling !== nav) menus.insertAdjacentElement('afterend', nav);
+	if (menus) {
+		if (menus.nextElementSibling !== nav) menus.insertAdjacentElement('afterend', nav);
+	} else {
+		// macOS : pas de menus Steam dans la fenêtre (ils sont dans la barre du système) ; notre navigation suit les feux
+		const drag = bar.querySelector(':scope > .DragArea');
+		if (drag && drag.previousElementSibling !== nav) drag.insertAdjacentElement('beforebegin', nav);
+	}
 
 	const controls = bar.querySelector(':scope > .TitleBarControls');
 	let account = controls?.querySelector(':scope > .sp-account-host') || null;

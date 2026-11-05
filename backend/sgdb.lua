@@ -6,6 +6,7 @@
 local http   = require("http")
 local cjson  = require("json") -- le module s'appelle « json » dans Millennium (implémentation cjson)
 local logger = require("logger")
+local binary = require("binary")
 
 -- utils est chargé prudemment : un module absent ne doit pas faire tomber tout le backend.
 local has_utils, utils = pcall(require, "utils")
@@ -241,40 +242,7 @@ local function detect_format(bytes)
 end
 
 -- Le module http de Millennium coupe le corps de la réponse au premier octet nul : inutilisable
--- pour une image. On télécharge donc dans un fichier temporaire via urlmon (FFI LuaJIT, Windows),
--- puis on le relit en binaire.
-local win = nil
-do
-    local ok_ffi, ffi = pcall(require, "ffi")
-    if ok_ffi and ffi.os == "Windows" then
-        pcall(ffi.cdef, [[
-            long __stdcall URLDownloadToFileA(void *caller, const char *url, const char *file, unsigned long reserved, void *cb);
-            unsigned long __stdcall GetTempPathA(unsigned long len, char *buf);
-        ]])
-        local ok_lib, urlmon = pcall(ffi.load, "urlmon")
-        if ok_lib then win = { ffi = ffi, urlmon = urlmon } end
-    end
-end
-
-local function download_to_memory(url)
-    if not win then return nil, "téléchargement binaire indisponible sur ce système" end
-    local ffi = win.ffi
-    local buf = ffi.new("char[?]", 520)
-    local n = ffi.C.GetTempPathA(520, buf)
-    if n == 0 then return nil, "dossier temporaire introuvable" end
-    local path = ffi.string(buf, n) .. "steamupgraded-sgdb-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999)) .. ".img"
-    local hr = tonumber(win.urlmon.URLDownloadToFileA(nil, url, path, 0, nil))
-    if hr ~= 0 then
-        os.remove(path)
-        return nil, string.format("erreur 0x%08X", hr % 4294967296)
-    end
-    local f = io.open(path, "rb")
-    if not f then return nil, "fichier téléchargé illisible" end
-    local data = f:read("*a")
-    f:close()
-    os.remove(path)
-    return data
-end
+-- pour une image. Téléchargement binaire commun : binary.lua.
 
 ---@ffi
 ---Télécharge une image SteamGridDB et la renvoie en base64 avec son format (png ou jpg).
@@ -282,7 +250,7 @@ end
 ---@return string
 function sgdb_download(url)
     if not allowed_url(url) then return fail("Adresse d'image refusée.") end
-    local ok, bytes, err = pcall(download_to_memory, url)
+    local ok, bytes, err = pcall(binary.download, url, "sgdb")
     if not ok then bytes, err = nil, tostring(bytes) end
     if not bytes then
         return fail("Téléchargement de l'image impossible (" .. tostring(err) .. ").")

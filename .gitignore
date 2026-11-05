@@ -4,4 +4,6 @@ installer/payload/
 installer/dist/
 installer/src-tauri/target/
 installer/src-tauri/gen/
+millennium/build/
+millennium/dist/
 .millennium/lsp/

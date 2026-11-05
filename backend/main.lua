@@ -7,6 +7,7 @@ require("store")
 require("art")
 require("uninstall")
 require("updates")
+require("millennium_pin")
 
 local function on_load()
     logger:info("Steam Upgraded chargé (Millennium " .. millennium.version() .. ")")

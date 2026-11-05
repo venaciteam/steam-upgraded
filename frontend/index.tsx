@@ -3,6 +3,7 @@ import { loadSettings } from './core/settings';
 import { initHistory } from './core/history';
 import { navigate, ROUTES } from './core/steam';
 import { initThemeEverywhere, Shell } from './shell/Shell';
+import { initClassAliases } from './core/classAliases';
 import { SettingsPage } from './pages/Settings';
 import { LibraryPage } from './pages/Library';
 import { GamePage } from './pages/Game';
@@ -33,6 +34,7 @@ let started = false;
 async function start() {
 	if (started) return;
 	started = true;
+	initClassAliases();
 	await loadSettings();
 	routerHook.addRoute(ROUTES.library, LibraryPage);
 	routerHook.addRoute('/steamupgraded/app/:appid', GamePage);

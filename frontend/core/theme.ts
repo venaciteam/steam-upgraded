@@ -140,6 +140,12 @@ ${hdrImages}
 .TopBar > .TitleBar .windowControlButton.closeButton{order:3;background:#ff5f57 !important;}
 .TopBar > .TitleBar .windowControlButton.minimizeButton{order:1;background:#febc2e !important;}
 .TopBar > .TitleBar .windowControlButton.restoreButton,.TopBar > .TitleBar .windowControlButton.maximizeButton{order:2;background:#28c840 !important;}
+/* macOS : ordre du système (fermer, réduire, agrandir), à gauche */
+.OSX .windowControlButton.closeButton{order:1 !important;}
+.OSX .windowControlButton.minimizeButton{order:2 !important;}
+.OSX .windowControlButton:is(.maximizeButton,.restoreButton){order:3 !important;}
+.TopBar.OSX > .TitleBar > .WindowControls{order:-1;}
+.TopBar.OSX > .TitleBar .title-bar-actions.window-controls{margin:0 6px 0 12px !important;}
 .TopBar > .TitleBar .windowControlButton:hover{filter:brightness(1.12);}
 .TopBar > .TitleBar .windowControlButton .title-area-icon-inner{width:8px !important;height:8px !important;padding:0 !important;margin:0 !important;display:flex;opacity:0;transition:opacity .12s;}
 .TopBar > .TitleBar .windowControlButton svg{width:8px !important;height:8px !important;}
@@ -149,6 +155,9 @@ ${hdrImages}
 .TopBar > .TitleBar .windowControlButton.minimizeButton svg{display:none !important;}
 .TopBar > .TitleBar .windowControlButton.minimizeButton .title-area-icon-inner{align-items:center;justify-content:center;}
 .TopBar > .TitleBar .windowControlButton.minimizeButton .title-area-icon-inner::after{content:"";width:8px;height:2px;border-radius:1px;background:rgba(0,0,0,.62);}
+/* macOS : Steam dessine déjà ses symboles (×, −, +) en image dans les pastilles ; notre trait (pour Windows, sans symbole) s'y superposerait */
+.OSX .windowControlButton.minimizeButton .title-area-icon-inner::after{content:none !important;}
+.TopBar.OSX > .TitleBar .windowControlButton .title-area-icon-inner{width:14px !important;height:14px !important;background-size:contain !important;background-position:center !important;background-repeat:no-repeat !important;}
 .TitleBarControls > .tool-tip-source:has(.NotificationButtonContainer) .NotificationButtonContainer,.TitleBarControls > .tool-tip-source:has(.NotificationButtonContainer) .NotificationButtonContainer > div{display:flex;align-items:center;width:auto !important;margin:0 !important;padding:0 !important;}
 .TopBar > .TitleBar .GamepadUIToggle:hover{background:var(--sp-surface2) !important;color:var(--sp-text) !important;}
 
@@ -535,6 +544,13 @@ body.client_chat_frame,.friendlist,.chat_main,.popup_chat_frame{background:var(-
 /* Contacts et discussions (lot 3) : en-tête, profil en carte, avatars ronds, intitulés de section */
 .friendlist .chatTitleBar{position:relative;height:44px !important;min-height:44px !important;background:var(--sp-surface) !important;}
 .friendlist .chatTitleBar::before{content:"Contacts et discussions";position:absolute;left:16px;top:15px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-muted);pointer-events:none;}
+/* macOS : les boutons de fenêtre sont à gauche (ordre et place de macOS) ; le titre passe à droite, en miroir de Windows */
+.chatTitleBar.OSX::before{left:auto !important;right:16px;}
+/* Liseré de focus natif de Steam (ligne d'1 px en haut des fenêtres actives, bleu de Steam ; .singleWindowFocusBar dans les
+   contacts et discussions) : à l'accent du thème, plus fort que la règle « pas de dégradés » des contacts.
+   Fenêtre principale : notre liseré (FocusLine) le remplace déjà. */
+:root body :is(.title-area-highlight.title-area-highlight.title-area-highlight,.singleWindowFocusBar.singleWindowFocusBar.singleWindowFocusBar){background:linear-gradient(to right,var(--sp-accent),color-mix(in srgb,var(--sp-accent) 70%,transparent)) !important;}
+.TopBar .title-area-highlight{display:none !important;}
 .friendlist div:has(> .AvatarAndUser){background:var(--sp-surface) !important;padding:2px 14px 14px;}
 .friendlist div:has(> .AvatarAndUser) > svg{display:none !important;}
 .friendlist .AvatarAndUser{box-sizing:border-box;width:100% !important;margin:0 !important;padding:8px 12px !important;border:1px solid var(--sp-line);border-radius:16px;background:var(--sp-surface2) !important;}

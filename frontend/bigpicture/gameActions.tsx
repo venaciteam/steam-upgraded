@@ -1,7 +1,8 @@
 // Briques communes aux écrans Big Picture qui montrent des jeux : visuels, actions, menu d'options (X).
 import { Menu, MenuItem, MenuSeparator, showContextMenu } from 'millennium';
+import { gameActions } from '../core/machines';
 import { useArt } from '../core/art';
-import { bpNavigate, bpWindow, coverUrl, heroUrl, playOrInstall, ROUTES } from '../core/steam';
+import { bpNavigate, bpWindow, coverUrl, heroUrl, ROUTES } from '../core/steam';
 import { openArtworkDialog } from '../features/sgdb';
 import { heroCandidates, isShortcut } from '../pages/game/data';
 import { FallbackImg } from '../pages/Game';
@@ -48,7 +49,15 @@ export function openGameOptions(app: any, anchor?: any) {
 	try {
 		showContextMenu(
 			<Menu label={app.display_name}>
-				<MenuItem onSelected={() => playOrInstall(app)}>{app.installed ? 'Jouer' : 'Installer'}</MenuItem>
+				{(() => {
+					// Jouer / installer / streamer : chaque possibilité s'il y a d'autres machines du compte (core/machines.ts)
+					const acts = gameActions(app);
+					return (acts.choices.length > 1 ? acts.choices : [acts.primary]).map((a, i) => (
+						<MenuItem key={`act${i}`} disabled={a.disabled} onSelected={() => !a.disabled && a.run()}>
+							{a.label}
+						</MenuItem>
+					));
+				})()}
 				<MenuItem onSelected={() => openGame(app.appid)}>Fiche du jeu</MenuItem>
 				<MenuSeparator />
 				<MenuItem onSelected={() => openPropertiesBp(app.appid)}>Propriétés</MenuItem>

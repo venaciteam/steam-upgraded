@@ -1,0 +1,19 @@
+{
+	"version": "3.6.2",
+	"tag": "v3.6.2",
+	"windows": {
+		"url": "https://github.com/SteamClientHomebrew/Millennium/releases/download/v3.6.2/millennium-v3.6.2-windows-x86_64.zip",
+		"size": 4003247,
+		"sha256": "cd78cf680563491d24f58a4fc948dcfc7cb3b38523ac80162845e52b06151cc2"
+	},
+	"linux": {
+		"url": "https://github.com/SteamClientHomebrew/Millennium/releases/download/v3.6.2/millennium-v3.6.2-linux-x86_64.tar.gz",
+		"size": 8790550,
+		"sha256": "95bda40184dd6437da1668060ec5961c762f3c1e59923f53380e43d4e720f359"
+	},
+	"macos": {
+		"url": "https://github.com/venaciteam/steam-upgraded/releases/download/v0.2.0/millennium-v3.6.2-macos-arm64.tar.gz",
+		"size": 3382644,
+		"sha256": "3b0834d706151b23657fca7456b7a0bfcd6a3221980a2fed757b73d8b8ff9c14"
+	}
+}

@@ -7,6 +7,7 @@ local http   = require("http")
 local cjson  = require("json")
 local fs     = require("fs")
 local logger = require("logger")
+local binary = require("binary")
 
 local REPO = "venaciteam/steam-upgraded"
 local STAR = "com.venacity.steamupgraded.star"
@@ -30,60 +31,7 @@ local function str(v)
     return tostring(v)
 end
 
--- ---------- Windows : téléchargement binaire et SHA-256 (FFI LuaJIT) ----------
-
--- Le module http coupe une réponse au premier octet nul (voir sgdb.lua) : le .star passe par urlmon.
-local win = nil
-do
-    local ok_ffi, ffi = pcall(require, "ffi")
-    if ok_ffi and ffi.os == "Windows" then
-        pcall(ffi.cdef, [[
-            long __stdcall URLDownloadToFileA(void *caller, const char *url, const char *file, unsigned long reserved, void *cb);
-            unsigned long __stdcall GetTempPathA(unsigned long len, char *buf);
-            long __stdcall BCryptOpenAlgorithmProvider(void **phAlgorithm, const uint16_t *pszAlgId, const uint16_t *pszImplementation, unsigned long dwFlags);
-            long __stdcall BCryptHash(void *hAlgorithm, unsigned char *pbSecret, unsigned long cbSecret, const unsigned char *pbInput, unsigned long cbInput, unsigned char *pbOutput, unsigned long cbOutput);
-            long __stdcall BCryptCloseAlgorithmProvider(void *hAlgorithm, unsigned long dwFlags);
-        ]])
-        local ok_u, urlmon = pcall(ffi.load, "urlmon")
-        local ok_b, bcrypt = pcall(ffi.load, "bcrypt")
-        win = { ffi = ffi, urlmon = ok_u and urlmon or nil, bcrypt = ok_b and bcrypt or nil }
-    end
-end
-
-local function download(url)
-    if not (win and win.urlmon) then return nil, "téléchargement indisponible sur ce système" end
-    local ffi = win.ffi
-    local buf = ffi.new("char[?]", 520)
-    local n = ffi.C.GetTempPathA(520, buf)
-    if n == 0 then return nil, "dossier temporaire introuvable" end
-    local path = ffi.string(buf, n) .. "steamupgraded-maj-" .. tostring(os.time()) .. ".star"
-    local hr = tonumber(win.urlmon.URLDownloadToFileA(nil, url, path, 0, nil))
-    if hr ~= 0 then
-        os.remove(path)
-        return nil, string.format("erreur 0x%08X", hr % 4294967296)
-    end
-    local f = io.open(path, "rb")
-    if not f then return nil, "fichier téléchargé illisible" end
-    local data = f:read("*a")
-    f:close()
-    os.remove(path)
-    return data
-end
-
-local function sha256(data)
-    if not (win and win.bcrypt) then return nil end
-    local ffi = win.ffi
-    local alg = ffi.new("void*[1]")
-    local name = ffi.new("uint16_t[7]", { 83, 72, 65, 50, 53, 54, 0 }) -- "SHA256" en UTF-16
-    if win.bcrypt.BCryptOpenAlgorithmProvider(alg, name, nil, 0) ~= 0 then return nil end
-    local out = ffi.new("unsigned char[32]")
-    local st = win.bcrypt.BCryptHash(alg[0], nil, 0, data, #data, out, 32)
-    win.bcrypt.BCryptCloseAlgorithmProvider(alg[0], 0)
-    if st ~= 0 then return nil end
-    local hex = {}
-    for i = 0, 31 do hex[#hex + 1] = string.format("%02x", out[i]) end
-    return table.concat(hex)
-end
+-- Téléchargement binaire et SHA-256 : voir binary.lua (le module http coupe une réponse au premier octet nul).
 
 local function read_file(path)
     local f = io.open(path, "rb")
@@ -114,6 +62,20 @@ end
 local function previous_paths(path)
     local dir = tostring(path):gsub("[/\\][^/\\]+[/\\][^/\\]+$", "")
     return dir .. "/steam-upgraded-precedente.star", dir .. "/steam-upgraded-precedente.json"
+end
+
+-- Notes de l'installeur (millennium/steam-upgraded-installeur.json) : il y lit la version du plugin. Après une mise à
+-- jour faite depuis Steam, elle est tenue à jour ici, sinon l'installeur afficherait l'ancienne version et proposerait
+-- « Réparer » au lieu de « Mettre à jour ». Seule la valeur est remplacée dans le texte : le reste du fichier ne bouge pas.
+-- Plugin posé sans l'installeur (pas de notes) : rien à faire.
+local function note_installed_version(path, version)
+    version = str(version)
+    if not version or not version:match("^%d+%.%d+%.%d+$") then return end
+    local marker = tostring(path):gsub("[/\\][^/\\]+[/\\][^/\\]+$", "") .. "/steam-upgraded-installeur.json"
+    local text = read_file(marker)
+    if not text then return end
+    local updated, n = text:gsub('("pluginVersion"%s*:%s*)"[^"]*"', '%1"' .. version .. '"', 1)
+    if n == 1 and updated ~= text then write_file(marker, updated) end
 end
 
 -- ---------- Fonctions appelées par le frontend ----------
@@ -169,10 +131,10 @@ function sp_update_install(path, url, hash, current)
     if url:sub(1, #DOWNLOAD_PREFIX) ~= DOWNLOAD_PREFIX or url:sub(-#STAR) ~= STAR then return fail("Adresse de téléchargement refusée.") end
     if not hash:match("^%x+$") or #hash ~= 64 then return fail("Empreinte du fichier absente : mise à jour refusée par prudence.") end
 
-    local ok, data, err = pcall(download, url)
+    local ok, data, err = pcall(binary.download, url, "maj")
     if not ok then data, err = nil, tostring(data) end
     if not data or #data == 0 then return fail("Téléchargement impossible (" .. tostring(err or "fichier vide") .. ").") end
-    local got = sha256(data)
+    local got = binary.sha256(data)
     if not got then return fail("Vérification de l'empreinte impossible sur ce système.") end
     if got ~= hash then return fail("Le fichier téléchargé ne correspond pas à la publication (empreinte différente). Rien n'a été modifié.") end
     if not is_star(data) then return fail("Le fichier téléchargé n'est pas un plugin valide. Rien n'a été modifié.") end
@@ -189,6 +151,7 @@ function sp_update_install(path, url, hash, current)
         write_file(path, old)
         return fail("Remplacement du plugin impossible (" .. tostring(werr) .. "). La version actuelle est remise en place.")
     end
+    note_installed_version(path, url:match("/download/v(%d+%.%d+%.%d+)/"))
     logger:info("Mise à jour installée (" .. #data .. " octets), version précédente gardée de côté")
     return encode({ ok = true })
 end
@@ -222,6 +185,8 @@ function sp_update_rollback(path)
         if current then write_file(path, current) end
         return fail("Remplacement du plugin impossible (" .. tostring(werr) .. ").")
     end
+    local mok, meta = pcall(cjson.decode, read_file(prev_json) or "")
+    if mok and type(meta) == "table" then note_installed_version(path, meta.version) end
     fs.remove(prev_star)
     fs.remove(prev_json)
     logger:info("Retour à la version précédente du plugin")

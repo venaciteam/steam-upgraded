@@ -1,6 +1,7 @@
 // Big Picture › Recherche (remplace /search) : un champ (clavier virtuel de Steam sur A), des catégories
 // changées avec LB/RB (Tout, Bibliothèque, Contacts, Magasin, Outils) et les résultats en grille.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { installedHere } from '../core/machines';
 import { DialogButton, Focusable, GamepadButton, TextField } from 'millennium';
 import { allApps, avatarUrl, bpRouter, landscapeUrl, playerName } from '../core/steam';
 import { BpFrame, goBackBp, useClock } from './Frame';
@@ -129,7 +130,7 @@ function ResultCard({ r }: { r: Result }) {
 		<DialogButton className="spbp-result" noFocusRing onClick={() => openGame(r.app.appid)} onOKActionDescription="Fiche du jeu" aria-label={r.name}>
 			<Landscape app={r.app} fallback={landscapeUrl(r.app)} className="spbp-result-img" />
 			<span className="spbp-result-name">{r.name}</span>
-			<span className="spbp-result-sub">{r.kind === 'tool' ? 'Outil' : r.app.installed ? 'Installé' : 'Dans la bibliothèque'}</span>
+			<span className="spbp-result-sub">{r.kind === 'tool' ? 'Outil' : installedHere(r.app) ? 'Installé' : 'Dans la bibliothèque'}</span>
 		</DialogButton>
 	);
 }

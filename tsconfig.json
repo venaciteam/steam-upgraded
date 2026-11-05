@@ -28,5 +28,10 @@
   "include": [
     "**/*",
     ".millennium/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "millennium/build",
+    "millennium/dist"
   ]
 }

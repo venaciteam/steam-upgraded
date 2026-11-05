@@ -1,5 +1,6 @@
 // Accès aux données et actions du client Steam (SharedJSContext).
 import { MEMBER_COLORS } from './theme';
+import { runPrimary } from './machines';
 
 const w = window as any;
 
@@ -195,9 +196,9 @@ export function formatLastPlayed(rt: number): string {
 
 // ---------- Actions sur un jeu ----------
 
+/** Action principale du jeu sur l'ordinateur devant soi (voir core/machines.ts : jouer, installer ou streamer). */
 export function playOrInstall(app: any) {
-	if (app.installed) w.SteamClient.Apps.RunGame(String(app.gameid || app.appid), '', -1, 100);
-	else w.SteamClient.Installs.OpenInstallWizard([app.appid]);
+	runPrimary(app);
 }
 
 export function openProperties(app: any) {

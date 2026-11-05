@@ -1,5 +1,6 @@
 // Données de la fiche d'un jeu : détails Steam, succès, famille, amis, relevés de temps de jeu.
 import { pluginConfig } from 'millennium';
+import { ActionKind, GameAction, gameActions } from '../../core/machines';
 import { useEffect, useState } from 'react';
 import { appById, avatarUrl, familyMembers, myAccountId, playerName } from '../../core/steam';
 import { currentPath, usePath } from '../../core/history';
@@ -72,22 +73,30 @@ export function useGame(appid: number): { app: any; details: any; tick: number }
 
 // ---------- Bouton principal ----------
 
-export type PrimaryState = { label: string; disabled: boolean; hint?: string };
+export type PrimaryState = { label: string; disabled: boolean; hint?: string; kind: ActionKind; choices: GameAction[] };
 
 const UPDATE_STATES = new Set([18, 19, 20, 21, 39]);
 
+/**
+ * Bouton principal d'un jeu : l'action sur l'ordinateur devant soi (core/machines.ts), avec les états en cours
+ * (lancement, téléchargement…) de la machine visée. `choices` : toutes les possibilités, pour la flèche du bouton.
+ */
 export function primaryState(app: any): PrimaryState {
-	const ds = Number(app?.display_status ?? 0);
-	if (ds === 4) return { label: 'En cours', disabled: true, hint: 'Le jeu est lancé' };
-	if (ds === 1) return { label: 'Lancement…', disabled: true };
-	if (ds === 36) return { label: 'Fermeture…', disabled: true };
-	if (ds === 37) return { label: 'Copie utilisée', disabled: true, hint: 'Le propriétaire joue en ce moment' };
-	if (ds === 17) return { label: 'Copie utilisée', disabled: true, hint: 'Un autre membre de la famille joue sur cette copie' };
-	if (ds === 3 || ds === 7 || ds === 23 || ds === 22) return { label: 'Téléchargement…', disabled: true, hint: 'Suivi dans les téléchargements' };
-	if (ds === 6) return { label: 'Mise à jour…', disabled: true, hint: 'Suivi dans les téléchargements' };
-	if (app?.installed && UPDATE_STATES.has(ds)) return { label: 'Mettre à jour', disabled: false };
-	if (app?.installed) return { label: 'Jouer', disabled: false };
-	return { label: 'Installer', disabled: false };
+	const { primary, choices } = gameActions(app);
+	const base = { kind: primary.kind, choices };
+	const ds = Number(primary.machine ? primary.machine.displayStatus : (app?.display_status ?? 0));
+	if (ds === 4) return { ...base, label: 'En cours', disabled: true, hint: 'Le jeu est lancé' };
+	if (ds === 1) return { ...base, label: 'Lancement…', disabled: true };
+	if (ds === 36) return { ...base, label: 'Fermeture…', disabled: true };
+	if (ds === 37) return { ...base, label: 'Copie utilisée', disabled: true, hint: 'Le propriétaire joue en ce moment' };
+	if (ds === 17) return { ...base, label: 'Copie utilisée', disabled: true, hint: 'Un autre membre de la famille joue sur cette copie' };
+	if (primary.kind === 'play' || primary.kind === 'install' || primary.kind === 'remote-install') {
+		if (ds === 3 || ds === 7 || ds === 23 || ds === 22) return { ...base, label: 'Téléchargement…', disabled: true, hint: 'Suivi dans les téléchargements' };
+		if (ds === 6) return { ...base, label: 'Mise à jour…', disabled: true, hint: 'Suivi dans les téléchargements' };
+		if (primary.kind === 'play' && UPDATE_STATES.has(ds)) return { ...base, label: 'Mettre à jour', disabled: false };
+	}
+	if (primary.kind === 'unavailable') return { ...base, label: primary.label, disabled: true, hint: 'Ce jeu n’existe pas pour ce système' };
+	return { ...base, label: primary.label, disabled: false };
 }
 
 // ---------- Visuels avec repli ----------

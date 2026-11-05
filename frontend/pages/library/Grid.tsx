@@ -126,7 +126,7 @@ function TilePanel({ g, maxMins, onOpen }: { g: Game; maxMins: number; onOpen: (
 							e.stopPropagation();
 							onOpen();
 						}}
-						style={{ flex: 'none', height: 32, padding: '0 11px', fontSize: 13 }}
+						style={{ flex: 'none', height: 32, padding: '0 9px', fontSize: 13 }}
 					>
 						Fiche
 					</button>

@@ -1,0 +1,2184 @@
+Millennium 3.6.2 pour macOS (arm64), correctifs appliqués au-dessus de l'étiquette officielle v3.6.2
+de https://github.com/SteamClientHomebrew/Millennium
+
+Origine : support macOS de Millennium (PR #841, « Restore macOS support », par iFleey,
+https://github.com/SteamClientHomebrew/Millennium/pull/841), fusionné avec v3.6.2 pour Steam Upgraded.
+Millennium : Copyright (c) 2026 Project Millennium, licence MIT (voir ../LICENSE-Millennium.md).
+Ces correctifs sont distribués sous la même licence.
+
+Appliqué par millennium/build-macos.sh (git apply). Tout ce qui précède la première ligne « diff --git » est ignoré.
+
+diff --git a/CMakePresets.json b/CMakePresets.json
+index 273a0540..7d70dbc8 100644
+--- a/CMakePresets.json
++++ b/CMakePresets.json
+@@ -100,7 +100,8 @@
+       "description": "MacOS release build.",
+       "binaryDir": "${sourceDir}/build/osx-release",
+       "cacheVariables": {
+-        "CMAKE_BUILD_TYPE": "Release"
++        "CMAKE_BUILD_TYPE": "Release",
++        "CMAKE_OSX_SYSROOT": "macosx"
+       }
+     },
+     {
+@@ -110,7 +111,8 @@
+       "description": "MacOS debug build.",
+       "binaryDir": "${sourceDir}/build/osx-debug",
+       "cacheVariables": {
+-        "CMAKE_BUILD_TYPE": "Debug"
++        "CMAKE_BUILD_TYPE": "Debug",
++        "CMAKE_OSX_SYSROOT": "macosx"
+       }
+     },
+     {
+diff --git a/scripts/macos/install_macos.sh b/scripts/macos/install_macos.sh
+index a78fa71c..39bb6553 100755
+--- a/scripts/macos/install_macos.sh
++++ b/scripts/macos/install_macos.sh
+@@ -2,7 +2,7 @@
+ 
+ set -euo pipefail
+ 
+-readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ readonly PROXY_SOURCE="${REPO_ROOT}/src/bootstrap/macos/tier0_proxy.cc"
+ readonly DEFAULT_STEAM_DIR="${HOME}/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS"
+ readonly DEFAULT_WRAPPER_BUILD_DIR="${REPO_ROOT}/build/osx-debug/src/bootstrap/macos"
+@@ -15,6 +15,7 @@ readonly DEFAULT_RUNTIME_SEARCH_DIRS=(
+ readonly REQUIRED_RUNTIME_ARTIFACTS=(
+     "libmillennium.dylib"
+     "libmillennium_hhx64.dylib"
++    "libmillennium_luavm_x86"
+ )
+ readonly OPTIONAL_RUNTIME_ARTIFACTS=(
+     "libmillennium_child_hook.dylib"
+@@ -26,6 +27,7 @@ readonly WRAPPER_RUNTIME_ARTIFACTS=(
+     "libmillennium.dylib"
+     "libmillennium_hhx64.dylib"
+     "libmillennium_child_hook.dylib"
++    "libmillennium_luavm_x86"
+ )
+ readonly WRAPPER_ASSET_RELATIVE_DIR="millennium-assets"
+ readonly APP_INFO_TEMPLATE="${REPO_ROOT}/src/bootstrap/macos/Info.plist.xml"
+@@ -213,9 +215,10 @@ copy_wrapper_assets_into_runtime() {
+     local loader_target_dir="${asset_root}/loader"
+     local chunks_target_dir="${loader_target_dir}/chunks"
+ 
+-    local loader_entry="${REPO_ROOT}/src/typescript/sdk/packages/loader/build/millennium.js"
+-    local chunks_source_dir="${REPO_ROOT}/src/typescript/sdk/packages/loader/build/chunks"
+-    local frontend_source="${REPO_ROOT}/build/frontend.bin"
++    local loader_build_dir="${REPO_ROOT}/src/typescript/sdk/build"
++    local loader_entry="${loader_build_dir}/millennium.js"
++    local chunks_source_dir="${loader_build_dir}/chunks"
++    local frontend_source="${REPO_ROOT}/src/typescript/.frontend.bin"
+ 
+     [ -f "${loader_entry}" ] || fail "Missing loader entry asset: ${loader_entry}"
+     [ -d "${chunks_source_dir}" ] || fail "Missing loader chunks directory: ${chunks_source_dir}"
+@@ -611,6 +614,9 @@ compile_tier0_proxy() {
+         -fvisibility=hidden \
+         -arch arm64 \
+         -arch x86_64 \
++        '-D__MILLENNIUM_OUTPUT_NAME__="libmillennium.dylib"' \
++        '-D__MILLENNIUM_HOOK_HELPER_OUTPUT_NAME__="libmillennium_hhx64.dylib"' \
++        '-D__MILLENNIUM_CHILD_HOOK_OUTPUT_NAME__="libmillennium_child_hook.dylib"' \
+         -Wl,-install_name,@loader_path/${TIER0_NAME}.proxy \
+         -Wl,-reexport_library,"${backup_tier0}" \
+         "${PROXY_SOURCE}" \
+diff --git a/scripts/macos/launch_macos.sh b/scripts/macos/launch_macos.sh
+index 1dc88820..0560c14d 100755
+--- a/scripts/macos/launch_macos.sh
++++ b/scripts/macos/launch_macos.sh
+@@ -2,7 +2,7 @@
+ 
+ set -euo pipefail
+ 
+-readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ readonly DEFAULT_STEAM_EXECUTABLE="${HOME}/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steam_osx"
+ readonly DEFAULT_WRAPPER_SEARCH_DIRS=(
+     "${REPO_ROOT}/build/osx-debug/src/bootstrap/macos"
+@@ -146,7 +146,7 @@ resolve_bootstrap_asset_paths() {
+         "${REPO_ROOT}/src/typescript/.frontend.bin"
+     )
+     local loader_candidates=(
+-        "${REPO_ROOT}/src/typescript/sdk/packages/loader/build/millennium.js"
++        "${REPO_ROOT}/src/typescript/sdk/build/millennium.js"
+     )
+ 
+     local frontend_asset=""
+diff --git a/src/bootstrap/README.md b/src/bootstrap/README.md
+index 1337d0fc..135e12b8 100644
+--- a/src/bootstrap/README.md
++++ b/src/bootstrap/README.md
+@@ -6,4 +6,4 @@
+ > -   Linux -> libXtst.so.6 proxy hook
+ > -   macOS (Install, default) -> `Steam Millennium.app` wrapper + runtime payload installed by `scripts/install_macos.sh`
+ > -   macOS (Legacy install) -> `libtier0_s.dylib` reexport proxy via `scripts/install_macos.sh --tier0-legacy`
+-> -   macOS (Debug) -> `steam_osx` wrapper + bootstrap dylib preload + `execve` reinjection into Steam main process + child hook that loads `hhx64` in Steam Helper
++> -   macOS (Debug) -> `steam_osx` wrapper + bootstrap dylib preload + `execv`/`execve` reinjection into Steam main process + child hook that loads `hhx64` in Steam Helper
+diff --git a/src/bootstrap/macos/CMakeLists.txt b/src/bootstrap/macos/CMakeLists.txt
+index 1b9abdc0..1b5d1efa 100644
+--- a/src/bootstrap/macos/CMakeLists.txt
++++ b/src/bootstrap/macos/CMakeLists.txt
+@@ -37,6 +37,9 @@ set_target_properties(macos-child-hook PROPERTIES
+     PREFIX ""
+     OUTPUT_NAME "${MILLENNIUM_CHILD_HOOK_OUTPUT_NAME}"
+     SUFFIX ""
++    # Injected into every process Steam spawns, including arm64e Apple system
++    # binaries; dyld needs a matching slice or those processes abort on launch.
++    OSX_ARCHITECTURES "arm64;arm64e;x86_64"
+ )
+ 
+ add_executable(SteamWrapper steam_launcher.cc)
+diff --git a/src/bootstrap/macos/dylib_bootstrap.cc b/src/bootstrap/macos/dylib_bootstrap.cc
+index 41ee32b2..1938ac10 100644
+--- a/src/bootstrap/macos/dylib_bootstrap.cc
++++ b/src/bootstrap/macos/dylib_bootstrap.cc
+@@ -11,6 +11,7 @@
+ 
+ #include <string>
+ #include <vector>
++#include "pipe_bootstrap.h"
+ 
+ typedef int (*start_millennium_t)(void);
+ typedef int (*stop_millennium_t)(void);
+@@ -20,7 +21,6 @@ extern char** environ;
+ namespace
+ {
+ constexpr const char* kRuntimePathEnv = "MILLENNIUM_RUNTIME_PATH";
+-constexpr const char* kHookHelperPathEnv = "MILLENNIUM_HOOK_HELPER_PATH";
+ constexpr const char* kChildHookPathEnv = "MILLENNIUM_CHILD_HOOK_PATH";
+ constexpr const char* kSteamExecutableEnv = "MILLENNIUM_STEAM_EXECUTABLE";
+ constexpr const char* kBootstrapTraceEnv = "MILLENNIUM_BOOTSTRAP_TRACE_PATH";
+@@ -41,22 +41,6 @@ static bool is_steam_main_process_name(const char* filename)
+     return strcmp(filename, "steam_osx") == 0 || strcmp(filename, "steam_osx.real") == 0;
+ }
+ 
+-static bool is_steam_helper_process_name(const char* filename)
+-{
+-    if (!filename) {
+-        return false;
+-    }
+-
+-    constexpr const char* kSteamHelperPrefix = "Steam Helper";
+-    constexpr size_t kSteamHelperPrefixLength = sizeof("Steam Helper") - 1;
+-    if (strncmp(filename, kSteamHelperPrefix, kSteamHelperPrefixLength) != 0) {
+-        return false;
+-    }
+-
+-    const char suffix = filename[kSteamHelperPrefixLength];
+-    return suffix == '\0' || suffix == ' ' || suffix == '(';
+-}
+-
+ static bool is_steam_main_process()
+ {
+     char path_buffer[PATH_MAX];
+@@ -76,41 +60,6 @@ static bool is_steam_main_process()
+     return is_steam_main_process_name(filename);
+ }
+ 
+-static const char* get_process_type_argument(char* const argv[])
+-{
+-    if (!argv) {
+-        return nullptr;
+-    }
+-
+-    for (size_t index = 1; argv[index] != nullptr; ++index) {
+-        if (strncmp(argv[index], "--type=", 7) == 0) {
+-            return argv[index] + 7;
+-        }
+-    }
+-
+-    return nullptr;
+-}
+-
+-static bool should_preload_helper_hook(const char* path, char* const argv[])
+-{
+-    const char* filename = nullptr;
+-
+-    if (path && path[0] != '\0') {
+-        filename = strrchr(path, '/');
+-        filename = filename ? filename + 1 : path;
+-    } else if (argv && argv[0] && argv[0][0] != '\0') {
+-        filename = strrchr(argv[0], '/');
+-        filename = filename ? filename + 1 : argv[0];
+-    }
+-
+-    if (!is_steam_helper_process_name(filename)) {
+-        return false;
+-    }
+-
+-    const char* process_type = get_process_type_argument(argv);
+-    return !process_type || strcmp(process_type, "crashpad-handler") != 0;
+-}
+-
+ static bool get_bootstrap_path(char* output, size_t output_size)
+ {
+     Dl_info info;
+@@ -198,21 +147,6 @@ static const char* get_child_hook_path()
+     return child_hook_path;
+ }
+ 
+-static const char* get_hook_helper_path()
+-{
+-    static char hook_helper_path[PATH_MAX];
+-    static bool initialized = false;
+-
+-    if (!initialized) {
+-        if (!get_adjacent_or_configured_path(kHookHelperPathEnv, __MILLENNIUM_HOOK_HELPER_OUTPUT_NAME__, R_OK, hook_helper_path, sizeof(hook_helper_path))) {
+-            return nullptr;
+-        }
+-        initialized = true;
+-    }
+-
+-    return hook_helper_path;
+-}
+-
+ static void append_trace(const char* stage)
+ {
+     const char* trace_path = getenv(kBootstrapTraceEnv);
+@@ -344,7 +278,6 @@ struct InjectionPlan
+     std::string dyldInsertLibraries;
+     bool includesBootstrap = false;
+     bool includesChildHook = false;
+-    bool includesHelperHook = false;
+ };
+ 
+ static bool is_steam_main_exec_target(const char* path)
+@@ -373,15 +306,13 @@ static bool is_steam_main_exec_target(const char* path)
+     return strcmp(normalized_path, normalized_target) == 0;
+ }
+ 
+-static InjectionPlan build_injection_plan(const char* path, char* const argv[], char* const envp[], const char* bootstrap_path_ptr)
++static InjectionPlan build_injection_plan(const char* path, char* const envp[], const char* bootstrap_path_ptr)
+ {
+     InjectionPlan plan;
+     const char* child_hook_path = get_child_hook_path();
+-    const char* hook_helper_path = get_hook_helper_path();
+ 
+     plan.includesBootstrap = bootstrap_path_ptr && is_steam_main_exec_target(path);
+     plan.includesChildHook = child_hook_path && access(child_hook_path, R_OK) == 0;
+-    plan.includesHelperHook = hook_helper_path && access(hook_helper_path, R_OK) == 0 && should_preload_helper_hook(path, argv);
+ 
+     std::vector<const char*> injected_libraries;
+     if (plan.includesBootstrap) {
+@@ -390,9 +321,6 @@ static InjectionPlan build_injection_plan(const char* path, char* const argv[],
+     if (plan.includesChildHook) {
+         injected_libraries.push_back(child_hook_path);
+     }
+-    if (plan.includesHelperHook) {
+-        injected_libraries.push_back(hook_helper_path);
+-    }
+ 
+     plan.dyldInsertLibraries = rewrite_injected_libraries(injected_libraries, plan.includesBootstrap ? nullptr : bootstrap_path_ptr, envp);
+     return plan;
+@@ -400,27 +328,15 @@ static InjectionPlan build_injection_plan(const char* path, char* const argv[],
+ 
+ static const char* describe_injection_plan(const InjectionPlan& plan)
+ {
+-    if (plan.includesBootstrap && plan.includesChildHook && plan.includesHelperHook) {
+-        return "bootstrap+child-hook+helper-hook";
+-    }
+     if (plan.includesBootstrap && plan.includesChildHook) {
+         return "bootstrap+child-hook";
+     }
+-    if (plan.includesBootstrap && plan.includesHelperHook) {
+-        return "bootstrap+helper-hook";
+-    }
+-    if (plan.includesChildHook && plan.includesHelperHook) {
+-        return "child-hook+helper-hook";
+-    }
+     if (plan.includesBootstrap) {
+         return "bootstrap";
+     }
+     if (plan.includesChildHook) {
+         return "child-hook";
+     }
+-    if (plan.includesHelperHook) {
+-        return "helper-hook";
+-    }
+     return "";
+ }
+ 
+@@ -462,6 +378,11 @@ static int call_execve_syscall(const char* path, char* const argv[], char* const
+ 
+ static int millennium_execve(const char* path, char* const argv[], char* const envp[])
+ {
++    // The inherited environment already contains the child hook. Both exec
++    // entry points can use it without allocating in the browser's fork child.
++    if (g_bootstrap_enabled && (envp == environ || !envp) && getpid() != millennium_pipe_bootstrap::owner && millennium_pipe_bootstrap::is_browser(path, argv)) {
++        return millennium_pipe_bootstrap::exec(path, argv, environ, call_execve_syscall);
++    }
+     append_exec_trace("exec-enter", path, argv, "");
+ 
+     if (!g_bootstrap_enabled) {
+@@ -471,7 +392,7 @@ static int millennium_execve(const char* path, char* const argv[], char* const e
+ 
+     char bootstrap_path[PATH_MAX];
+     const char* bootstrap_path_ptr = get_bootstrap_path(bootstrap_path, sizeof(bootstrap_path)) ? bootstrap_path : nullptr;
+-    const InjectionPlan plan = build_injection_plan(path, argv, envp, bootstrap_path_ptr);
++    const InjectionPlan plan = build_injection_plan(path, envp, bootstrap_path_ptr);
+     std::vector<std::string> owned_environment = build_child_environment(envp, plan.dyldInsertLibraries);
+     std::vector<char*> exec_environment;
+     exec_environment.reserve(owned_environment.size() + 1);
+@@ -480,13 +401,20 @@ static int millennium_execve(const char* path, char* const argv[], char* const e
+     }
+     exec_environment.push_back(nullptr);
+ 
+-    const char* trace_stage = plan.includesBootstrap || plan.includesChildHook || plan.includesHelperHook ? "exec-pass-through" : "exec-missing-injection";
++    const char* trace_stage = plan.includesBootstrap || plan.includesChildHook ? "exec-pass-through" : "exec-missing-injection";
+     append_exec_trace(trace_stage, path, argv, describe_injection_plan(plan));
+-    return call_execve_syscall(path, argv, exec_environment.data());
++    return millennium_pipe_bootstrap::exec(path, argv, exec_environment.data(), call_execve_syscall);
+ }
+ 
+ DYLD_INTERPOSE(millennium_execve, execve);
+ 
++static int millennium_execv(const char* path, char* const argv[])
++{
++    return millennium_execve(path, argv, environ);
++}
++
++DYLD_INTERPOSE(millennium_execv, execv);
++
+ __attribute__((constructor)) static void bootstrap_init()
+ {
+     if (!is_steam_main_process()) {
+@@ -517,10 +445,11 @@ __attribute__((constructor)) static void bootstrap_init()
+         return;
+     }
+ 
+-    if (start_millennium() < 0) {
++    if (!millennium_pipe_bootstrap::initialize(g_millennium_handle) || start_millennium() < 0) {
+         fprintf(stderr, "[Millennium] Failed to start runtime.\n");
+         dlclose(g_millennium_handle);
+         g_millennium_handle = nullptr;
++        millennium_pipe_bootstrap::shutdown();
+     }
+ }
+ 
+@@ -539,5 +468,6 @@ __attribute__((destructor)) static void bootstrap_cleanup()
+     g_millennium_handle = nullptr;
+ 
+     g_bootstrap_enabled = false;
++    millennium_pipe_bootstrap::shutdown();
+ }
+ #endif
+diff --git a/src/bootstrap/macos/pipe_bootstrap.h b/src/bootstrap/macos/pipe_bootstrap.h
+new file mode 100644
+index 00000000..90f7d809
+--- /dev/null
++++ b/src/bootstrap/macos/pipe_bootstrap.h
+@@ -0,0 +1,151 @@
++#pragma once
++
++#include <cerrno>
++#include <cstring>
++#include <dlfcn.h>
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <unistd.h>
++
++// Shared by the injected bootstrap and the legacy tier0 proxy. Only the fork
++// child maps CEF's fixed descriptors; Steam's own descriptors remain untouched.
++namespace millennium_pipe_bootstrap
++{
++static int sender = -1;
++static pid_t owner = 0;
++
++static int private_fd(int fd)
++{
++    if (fd < 0) return -1;
++    const int result = fcntl(fd, F_DUPFD_CLOEXEC, 10);
++    const int error = errno;
++    close(fd);
++    errno = error;
++    return result;
++}
++
++static bool initialize(void* runtime)
++{
++    auto accept = reinterpret_cast<int (*)(int)>(dlsym(runtime, "MillenniumAcceptPipeBroker"));
++    if (!accept) return false;
++    int pair[2];
++    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, pair) != 0) return false;
++    pair[0] = private_fd(pair[0]);
++    pair[1] = private_fd(pair[1]);
++    bool ok = pair[0] >= 0 && pair[1] >= 0;
++    if (ok) ok = fcntl(pair[1], F_SETFL, O_NONBLOCK) == 0 && accept(pair[0]) == 0;
++    if (pair[0] >= 0) close(pair[0]);
++    if (!ok) {
++        if (pair[1] >= 0) close(pair[1]);
++        return false;
++    }
++    sender = pair[1];
++    owner = getpid();
++    return true;
++}
++
++static void shutdown()
++{
++    if (sender >= 0) close(sender);
++    sender = -1;
++}
++
++static bool is_browser(const char* path, char* const argv[])
++{
++    if (!path || !argv) return false;
++    const char* name = strrchr(path, '/');
++    if (strcmp(name ? name + 1 : path, "Steam Helper") != 0) return false;
++    for (size_t i = 0; argv[i]; ++i) {
++        if (strncmp(argv[i], "--type=", 7) == 0 || strcmp(argv[i], "--type") == 0) return false;
++    }
++    return true;
++}
++
++using exec_fn = int (*)(const char*, char* const[], char* const[]);
++
++static int exec(const char* path, char* const argv[], char* const envp[], exec_fn next)
++{
++    if (sender < 0 || getpid() == owner || !is_browser(path, argv)) return next(path, argv, envp);
++
++    // Keep this FD handoff allocation-free. Leave oversized argv untouched.
++    char* args[4096];
++    size_t count = 0;
++    for (; argv[count]; ++count) {
++        if (count >= 4094) return next(path, argv, envp);
++        args[count] = argv[count];
++    }
++    args[count++] = const_cast<char*>("--remote-debugging-pipe");
++    args[count] = nullptr;
++
++    int fds[4] = { -1, -1, -1, -1 };
++    int saved[2] = { -1, -1 };
++    int flags[2] = { -1, -1 };
++    bool ok = true;
++    for (int i = 0; i < 2; ++i) {
++        flags[i] = fcntl(3 + i, F_GETFD);
++        if (flags[i] >= 0) {
++            saved[i] = fcntl(3 + i, F_DUPFD_CLOEXEC, 10);
++            if (saved[i] < 0) ok = false;
++        } else if (errno != EBADF) {
++            ok = false;
++        }
++    }
++    if (ok) ok = pipe(fds) == 0;
++    if (ok) {
++        fds[0] = private_fd(fds[0]);
++        fds[1] = private_fd(fds[1]);
++        ok = fds[0] >= 0 && fds[1] >= 0 && pipe(fds + 2) == 0;
++    }
++    if (ok) {
++        fds[2] = private_fd(fds[2]);
++        fds[3] = private_fd(fds[3]);
++        ok = fds[2] >= 0 && fds[3] >= 0;
++    }
++
++    bool mapped = false;
++    if (ok) {
++        mapped = true;
++        ok = dup2(fds[0], 3) >= 0 && dup2(fds[3], 4) >= 0;
++    }
++    if (ok) {
++        char byte = 1;
++        iovec iov{ &byte, 1 };
++        alignas(cmsghdr) char control[CMSG_SPACE(2 * sizeof(int))] = {};
++        msghdr msg{};
++        msg.msg_iov = &iov;
++        msg.msg_iovlen = 1;
++        msg.msg_control = control;
++        msg.msg_controllen = sizeof(control);
++        auto* rights = CMSG_FIRSTHDR(&msg);
++        rights->cmsg_level = SOL_SOCKET;
++        rights->cmsg_type = SCM_RIGHTS;
++        rights->cmsg_len = CMSG_LEN(2 * sizeof(int));
++        const int endpoints[2] = { fds[2], fds[1] };
++        memcpy(CMSG_DATA(rights), endpoints, sizeof(endpoints));
++        int result;
++        do {
++            result = sendmsg(sender, &msg, 0);
++        } while (result < 0 && errno == EINTR);
++        ok = result == 1;
++    }
++    for (int fd : fds)
++        if (fd >= 0) close(fd);
++    int result = -1;
++    if (ok) result = next(path, args, envp);
++    const int error = errno;
++    if (mapped) {
++        for (int i = 0; i < 2; ++i) {
++            if (saved[i] >= 0) {
++                dup2(saved[i], 3 + i);
++                fcntl(3 + i, F_SETFD, flags[i]);
++            } else {
++                close(3 + i);
++            }
++        }
++    }
++    for (int fd : saved)
++        if (fd >= 0) close(fd);
++    errno = error;
++    return ok ? result : next(path, argv, envp);
++}
++} // namespace millennium_pipe_bootstrap
+diff --git a/src/bootstrap/macos/steam_launcher.cc b/src/bootstrap/macos/steam_launcher.cc
+index 87547c95..0f3a2d89 100644
+--- a/src/bootstrap/macos/steam_launcher.cc
++++ b/src/bootstrap/macos/steam_launcher.cc
+@@ -9,12 +9,10 @@
+ #include <limits.h>
+ #include <mach-o/dyld.h>
+ #include <fcntl.h>
+-#include <netinet/in.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string>
+ #include <string.h>
+-#include <sys/socket.h>
+ #include <unistd.h>
+ #include <vector>
+ 
+@@ -26,7 +24,6 @@ constexpr const char* kRuntimePathEnv = "MILLENNIUM_RUNTIME_PATH";
+ constexpr const char* kHookHelperPathEnv = "MILLENNIUM_HOOK_HELPER_PATH";
+ constexpr const char* kChildHookPathEnv = "MILLENNIUM_CHILD_HOOK_PATH";
+ constexpr const char* kAssetsRootEnv = "MILLENNIUM_ASSETS_ROOT";
+-constexpr const char* kBrowserContextPathEnv = "MILLENNIUM_BROWSER_CONTEXT_PATH";
+ constexpr const char* kSteamExecutableEnv = "MILLENNIUM_STEAM_EXECUTABLE";
+ constexpr const char* kCefRemoteDebuggingMarker = ".cef-enable-remote-debugging";
+ constexpr const char* kDefaultSteamExecutableSuffix = "/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steam_osx";
+@@ -184,238 +181,6 @@ static bool resolve_steam_target(const char* wrapper_directory, char* output, si
+     return resolve_existing_path(default_runtime_path, output, output_size, X_OK);
+ }
+ 
+-static std::string reserve_debug_port()
+-{
+-    const int sock = socket(AF_INET, SOCK_STREAM, 0);
+-    if (sock < 0) {
+-        return {};
+-    }
+-
+-    sockaddr_in address = {};
+-    address.sin_family = AF_INET;
+-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+-    address.sin_port = 0;
+-
+-    if (bind(sock, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+-        close(sock);
+-        return {};
+-    }
+-
+-    socklen_t address_length = sizeof(address);
+-    if (getsockname(sock, reinterpret_cast<sockaddr*>(&address), &address_length) != 0) {
+-        close(sock);
+-        return {};
+-    }
+-
+-    const auto port = ntohs(address.sin_port);
+-    close(sock);
+-
+-    if (port == 0) {
+-        return {};
+-    }
+-
+-    return std::to_string(port);
+-}
+-
+-static std::string get_env_value(const char* name)
+-{
+-    const char* value = getenv(name);
+-    return value ? std::string(value) : std::string();
+-}
+-
+-static std::string read_http_response_body(const std::string& response)
+-{
+-    const size_t headers_end = response.find("\r\n\r\n");
+-    if (headers_end == std::string::npos) {
+-        return {};
+-    }
+-
+-    return response.substr(headers_end + 4);
+-}
+-
+-static std::string extract_browser_context_url(const std::string& response_body)
+-{
+-    static constexpr const char* kKey = "\"webSocketDebuggerUrl\"";
+-    const size_t key_start = response_body.find(kKey);
+-    if (key_start == std::string::npos) {
+-        return {};
+-    }
+-
+-    size_t cursor = key_start + strlen(kKey);
+-    while (cursor < response_body.size() && isspace(static_cast<unsigned char>(response_body[cursor]))) {
+-        ++cursor;
+-    }
+-
+-    if (cursor >= response_body.size() || response_body[cursor] != ':') {
+-        return {};
+-    }
+-
+-    ++cursor;
+-    while (cursor < response_body.size() && isspace(static_cast<unsigned char>(response_body[cursor]))) {
+-        ++cursor;
+-    }
+-
+-    if (cursor >= response_body.size() || response_body[cursor] != '"') {
+-        return {};
+-    }
+-
+-    ++cursor;
+-    std::string value;
+-    value.reserve(128);
+-
+-    bool escaped = false;
+-    while (cursor < response_body.size()) {
+-        const char ch = response_body[cursor++];
+-        if (escaped) {
+-            value.push_back(ch);
+-            escaped = false;
+-            continue;
+-        }
+-
+-        if (ch == '\\') {
+-            escaped = true;
+-            continue;
+-        }
+-
+-        if (ch == '"') {
+-            return value;
+-        }
+-
+-        value.push_back(ch);
+-    }
+-
+-    return {};
+-}
+-
+-static std::string ensure_browser_context_port(std::string browser_context_url, const char* debug_port)
+-{
+-    if (browser_context_url.empty() || !debug_port || debug_port[0] == '\0') {
+-        return browser_context_url;
+-    }
+-
+-    const size_t scheme_end = browser_context_url.find("://");
+-    if (scheme_end == std::string::npos) {
+-        return browser_context_url;
+-    }
+-
+-    const size_t authority_start = scheme_end + 3;
+-    const size_t path_start = browser_context_url.find('/', authority_start);
+-    const size_t port_separator = browser_context_url.find(':', authority_start);
+-
+-    if (port_separator != std::string::npos && (path_start == std::string::npos || port_separator < path_start)) {
+-        return browser_context_url;
+-    }
+-
+-    if (path_start == std::string::npos) {
+-        browser_context_url.append(":");
+-        browser_context_url.append(debug_port);
+-        return browser_context_url;
+-    }
+-
+-    browser_context_url.insert(path_start, ":");
+-    browser_context_url.insert(path_start + 1, debug_port);
+-    return browser_context_url;
+-}
+-
+-static std::string fetch_browser_context_once(const char* debug_port)
+-{
+-    if (!debug_port || debug_port[0] == '\0') {
+-        return {};
+-    }
+-
+-    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+-    if (fd < 0) {
+-        return {};
+-    }
+-
+-    timeval timeout = {};
+-    timeout.tv_sec = 1;
+-    timeout.tv_usec = 0;
+-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+-
+-    sockaddr_in address = {};
+-    address.sin_family = AF_INET;
+-    address.sin_port = htons(static_cast<uint16_t>(strtoul(debug_port, nullptr, 10)));
+-    if (inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) != 1) {
+-        close(fd);
+-        return {};
+-    }
+-
+-    if (connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+-        close(fd);
+-        return {};
+-    }
+-
+-    const std::string request = std::string("GET /json/version HTTP/1.1\r\nHost: 127.0.0.1:") + debug_port + "\r\nConnection: close\r\n\r\n";
+-
+-    if (send(fd, request.c_str(), request.size(), 0) < 0) {
+-        close(fd);
+-        return {};
+-    }
+-
+-    std::string response;
+-    char buffer[4096];
+-    while (true) {
+-        const ssize_t bytes_read = recv(fd, buffer, sizeof(buffer), 0);
+-        if (bytes_read <= 0) {
+-            break;
+-        }
+-
+-        response.append(buffer, static_cast<size_t>(bytes_read));
+-    }
+-
+-    close(fd);
+-    return ensure_browser_context_port(extract_browser_context_url(read_http_response_body(response)), debug_port);
+-}
+-
+-static void start_browser_context_probe()
+-{
+-    const std::string debug_port = get_env_value(kDebugPortEnv);
+-    if (debug_port.empty()) {
+-        return;
+-    }
+-
+-    char temp_path[] = "/tmp/millennium-browser-context-XXXXXX";
+-    const int temp_fd = mkstemp(temp_path);
+-    if (temp_fd < 0) {
+-        return;
+-    }
+-    close(temp_fd);
+-    unlink(temp_path);
+-
+-    setenv(kBrowserContextPathEnv, temp_path, 1);
+-
+-    const pid_t child_pid = fork();
+-    if (child_pid != 0) {
+-        return;
+-    }
+-
+-    unsetenv("DYLD_INSERT_LIBRARIES");
+-
+-    for (size_t attempt = 0; attempt < 120; ++attempt) {
+-        const std::string browser_context_url = fetch_browser_context_once(debug_port.c_str());
+-        if (!browser_context_url.empty()) {
+-            const int output_fd = open(temp_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+-            if (output_fd >= 0) {
+-                const auto bytes_written = write(output_fd, browser_context_url.c_str(), browser_context_url.size());
+-                close(output_fd);
+-                if (bytes_written == static_cast<ssize_t>(browser_context_url.size())) {
+-                    _exit(0);
+-                }
+-            }
+-
+-            unlink(temp_path);
+-            _exit(1);
+-        }
+-
+-        usleep(250000);
+-    }
+-
+-    unlink(temp_path);
+-    _exit(0);
+-}
+-
+ static void configure_debug_environment(int argc, char** argv)
+ {
+     const bool is_dev_mode = has_argument(argc, argv, "-dev");
+@@ -432,16 +197,7 @@ static void configure_debug_environment(int argc, char** argv)
+ 
+     if (is_dev_mode) {
+         setenv(kDebugPortEnv, kDefaultDebugPort, 1);
+-        return;
+     }
+-
+-    const std::string reserved_port = reserve_debug_port();
+-    if (!reserved_port.empty()) {
+-        setenv(kDebugPortEnv, reserved_port.c_str(), 1);
+-        return;
+-    }
+-
+-    setenv(kDebugPortEnv, kDefaultDebugPort, 1);
+ }
+ 
+ static bool ensure_cef_remote_debugging_marker(const char* steam_executable_path)
+@@ -576,24 +332,22 @@ static bool resolve_bootstrap_asset_sources(const char* wrapper_directory, std::
+     }
+ 
+ #ifdef MILLENNIUM_ROOT
++    /* Dev builds bake MILLENNIUM_ROOT to the repo root and read assets straight from the source tree. */
+     const std::filesystem::path repo_root(MILLENNIUM_ROOT);
+-    const std::filesystem::path legacy_loader_dir = repo_root / "src" / "typescript" / "sdk" / "packages" / "loader" / "build";
+-    const std::filesystem::path legacy_frontend_candidates[] = {
+-        repo_root / "src" / "typescript" / ".frontend.bin",
+-        repo_root / "build" / "frontend.bin",
+-    };
+-
+-    std::error_code legacy_error;
+-    if (std::filesystem::is_regular_file(legacy_loader_dir / "millennium.js", legacy_error) && !legacy_error &&
+-        std::filesystem::is_directory(legacy_loader_dir / "chunks", legacy_error) && !legacy_error) {
+-        for (const auto& candidate : legacy_frontend_candidates) {
+-            legacy_error.clear();
+-            if (std::filesystem::is_regular_file(candidate, legacy_error) && !legacy_error) {
+-                *loader_source_dir = legacy_loader_dir;
+-                *frontend_source = candidate;
+-                return true;
+-            }
+-        }
++    const std::filesystem::path dev_loader_dir = repo_root / "src" / "typescript" / "sdk" / "build";
++    const std::filesystem::path dev_frontend = repo_root / "src" / "typescript" / ".frontend.bin";
++
++    std::error_code dev_error;
++    const bool has_loader_entry = std::filesystem::is_regular_file(dev_loader_dir / "millennium.js", dev_error) && !dev_error;
++    dev_error.clear();
++    const bool has_chunks = std::filesystem::is_directory(dev_loader_dir / "chunks", dev_error) && !dev_error;
++    dev_error.clear();
++    const bool has_frontend = std::filesystem::is_regular_file(dev_frontend, dev_error) && !dev_error;
++
++    if (has_loader_entry && has_chunks && has_frontend) {
++        *loader_source_dir = dev_loader_dir;
++        *frontend_source = dev_frontend;
++        return true;
+     }
+ #endif
+ 
+@@ -799,9 +553,7 @@ int main(int argc, char** argv)
+ 
+     configure_debug_environment(argc, argv);
+ 
+-    start_browser_context_probe();
+-
+-    if (!ensure_cef_remote_debugging_marker(target_steam_path)) {
++    if (getenv(kDebugPortEnv) && !ensure_cef_remote_debugging_marker(target_steam_path)) {
+         fprintf(stderr, "[Millennium] Failed to create %s beside the Steam runtime.\n", kCefRemoteDebuggingMarker);
+         return 1;
+     }
+diff --git a/src/bootstrap/macos/tier0_proxy.cc b/src/bootstrap/macos/tier0_proxy.cc
+index 1b9ae8bd..2fc4fd12 100644
+--- a/src/bootstrap/macos/tier0_proxy.cc
++++ b/src/bootstrap/macos/tier0_proxy.cc
+@@ -11,6 +11,37 @@
+ #include <filesystem>
+ #include <mutex>
+ #include <string>
++#include <sys/syscall.h>
++#include "pipe_bootstrap.h"
++
++extern char** environ;
++
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wdeprecated-declarations"
++static int raw_execve(const char* path, char* const argv[], char* const envp[])
++{
++    return static_cast<int>(syscall(SYS_execve, path, argv, envp ? envp : environ));
++}
++#pragma clang diagnostic pop
++
++static int pipe_execve(const char* path, char* const argv[], char* const envp[])
++{
++    return millennium_pipe_bootstrap::exec(path, argv, envp, raw_execve);
++}
++
++static int pipe_execv(const char* path, char* const argv[])
++{
++    return pipe_execve(path, argv, environ);
++}
++
++__attribute__((used, section("__DATA,__interpose"))) static const struct
++{
++    const void* replacement;
++    const void* replacee;
++} pipe_interposers[] = {
++    { reinterpret_cast<const void*>(pipe_execve), reinterpret_cast<const void*>(execve) },
++    { reinterpret_cast<const void*>(pipe_execv),  reinterpret_cast<const void*>(execv)  },
++};
+ 
+ typedef int (*start_millennium_t)(void);
+ typedef int (*stop_millennium_t)(void);
+@@ -119,6 +150,8 @@ static bool try_extract_devtools_port_from_args(std::string& output)
+             continue;
+         }
+ 
++        if (strcmp(argument, "-dev") == 0) output = kDefaultDebugPort;
++
+         if (strcmp(argument, kDevtoolsPortArgument) == 0) {
+             if (argv[index + 1] && argv[index + 1][0] != '\0') {
+                 output = argv[index + 1];
+@@ -136,7 +169,7 @@ static bool try_extract_devtools_port_from_args(std::string& output)
+         }
+     }
+ 
+-    return false;
++    return !output.empty();
+ }
+ 
+ static bool ensure_cef_remote_debugging_marker(const char* steam_executable_path)
+@@ -245,8 +278,6 @@ static void ensure_runtime_environment_defaults()
+         std::string argument_port;
+         if (try_extract_devtools_port_from_args(argument_port)) {
+             setenv(kDebugPortEnv, argument_port.c_str(), 1);
+-        } else {
+-            setenv(kDebugPortEnv, kDefaultDebugPort, 1);
+         }
+     }
+ }
+@@ -260,7 +291,7 @@ static void ensure_frontend_bridge_prerequisites()
+     }
+ 
+     maybe_set_env_if_unset(kSteamExecutableEnv, steam_executable_path);
+-    if (!ensure_cef_remote_debugging_marker(steam_executable_path.c_str())) {
++    if (getenv(kDebugPortEnv) && !ensure_cef_remote_debugging_marker(steam_executable_path.c_str())) {
+         log_proxy("Failed to create .cef-enable-remote-debugging marker beside Steam executable.");
+     }
+ }
+@@ -295,11 +326,12 @@ static void start_millennium()
+         return;
+     }
+ 
+-    const int result = start_millennium_fn();
++    const int result = millennium_pipe_bootstrap::initialize(g_millennium_handle) ? start_millennium_fn() : -1;
+     if (result < 0) {
+         log_proxy("StartMillennium returned failure.");
+         dlclose(g_millennium_handle);
+         g_millennium_handle = nullptr;
++        millennium_pipe_bootstrap::shutdown();
+         return;
+     }
+ 
+@@ -322,6 +354,7 @@ static void stop_millennium()
+     dlclose(g_millennium_handle);
+     g_millennium_handle = nullptr;
+     g_millennium_started = false;
++    millennium_pipe_bootstrap::shutdown();
+ }
+ 
+ extern "C" __attribute__((visibility("default"))) const char* millennium_tier0_proxy_marker()
+diff --git a/src/engine/cdp_api.cc b/src/engine/cdp_api.cc
+index 87f1ed72..cc532ce4 100644
+--- a/src/engine/cdp_api.cc
++++ b/src/engine/cdp_api.cc
+@@ -218,7 +218,7 @@ std::future<json> cdp_client::send_host(const std::string& method, const json& p
+ 
+     std::lock_guard<std::mutex> send_lock(m_send_mutex);
+ 
+-    bool ok = m_sender(payload);
++    bool ok = !m_shutdown.load(std::memory_order_acquire) && m_sender(payload);
+ 
+     if (!ok) {
+         /** remove from pending and fail the promise */
+diff --git a/src/engine/cdp_connector.cc b/src/engine/cdp_connector.cc
+index 134b23e1..2d5ffaf8 100644
+--- a/src/engine/cdp_connector.cc
++++ b/src/engine/cdp_connector.cc
+@@ -362,6 +362,97 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
+     close(write_fd);
+     logger.log("Disconnected from [{}] module...", name);
+ }
++#elif __APPLE__
++
++#include <thread>
++#include "millennium/macos_cdp_pipe.h"
++#include "millennium/millennium_lifecycle.h"
++
++namespace
++{
++macos_cdp::broker pipe_broker;
++
++bool terminating()
++{
++    return millennium_lifecycle::get().terminate.flag.load();
++}
++} // namespace
++
++// Called before StartMillennium by both macOS bootstrap implementations.
++extern "C" __attribute__((visibility("default"))) int MillenniumAcceptPipeBroker(int fd)
++{
++    if (pipe_broker.fd >= 0) return -1;
++    pipe_broker.fd = fcntl(fd, F_DUPFD_CLOEXEC, 10);
++    return pipe_broker.fd < 0 ? -1 : 0;
++}
++
++void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> props)
++{
++    if (pipe_broker.fd < 0 || !props->on_connect) {
++        LOG_ERROR("[{}] macOS CDP pipe broker is not configured.", props->name);
++        return;
++    }
++
++    while (!terminating()) {
++        std::shared_ptr<macos_cdp::connection> conn;
++        while (!terminating() && !conn) {
++            pollfd wait{ pipe_broker.fd, POLLIN, 0 };
++            const int result = poll(&wait, 1, 100);
++            if (result < 0 && errno == EINTR) continue;
++            if (result < 0 || (wait.revents & (POLLERR | POLLHUP | POLLNVAL))) return;
++            if (wait.revents & POLLIN) conn = macos_cdp::receive(pipe_broker.fd);
++        }
++        if (!conn || terminating()) return;
++
++        auto cdp = std::make_shared<cdp_client>([conn](const std::string& payload)
++        {
++            return conn->send(payload, terminating);
++        });
++        logger.log("[{}] CDP pipe transport connected.", props->name);
++
++        // Read before on_connect: initialization may synchronously wait for CDP.
++        std::thread reader([conn, cdp]()
++        {
++            std::string buffer;
++            char chunk[8192];
++            while (!terminating() && !conn->stopped.load() && cdp->is_active()) {
++                // A queued handoff does not prove exec succeeded. Keep the
++                // current Helper connected until its own pipe closes.
++                pollfd wait{ conn->read_fd, POLLIN, 0 };
++                const int result = poll(&wait, 1, 100);
++                if (result < 0 && errno == EINTR) continue;
++                if (result < 0) break;
++                if (!wait.revents) continue;
++                const auto count = read(conn->read_fd, chunk, sizeof(chunk));
++                if (count < 0 && (errno == EINTR || errno == EAGAIN)) continue;
++                if (count <= 0) break;
++                buffer.append(chunk, static_cast<size_t>(count));
++                size_t offset = 0;
++                size_t end;
++                while ((end = buffer.find('\0', offset)) != std::string::npos) {
++                    if (end > offset) cdp->handle_message(buffer.substr(offset, end - offset));
++                    offset = end + 1;
++                }
++                buffer.erase(0, offset);
++            }
++            conn->stopped.store(true);
++            cdp->shutdown();
++        });
++
++        try {
++            props->on_connect(cdp);
++        } catch (const std::exception& e) {
++            LOG_ERROR("[{}] Exception in onConnect: {}", props->name, e.what());
++            conn->stopped.store(true);
++        } catch (...) {
++            LOG_ERROR("[{}] Unknown exception in onConnect.", props->name);
++            conn->stopped.store(true);
++        }
++        reader.join();
++        logger.log("[{}] CDP pipe disconnected; waiting for a new Helper.", props->name);
++    }
++}
++
+ #else
+ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket_props)
+ {
+diff --git a/src/engine/child_process.cc b/src/engine/child_process.cc
+index cd519221..ab804a28 100644
+--- a/src/engine/child_process.cc
++++ b/src/engine/child_process.cc
+@@ -545,13 +545,20 @@ std::unique_ptr<PluginProcess> spawn_plugin_process(const std::string& plugin_na
+ #ifdef _WIN32
+     plugin_ipc::socket_fd server_fd = static_cast<plugin_ipc::socket_fd>(::socket(AF_UNIX, SOCK_STREAM, 0));
+     if (server_fd == INVALID_SOCKET) {
+-#else
++#elif defined(__linux__)
+     plugin_ipc::socket_fd server_fd = static_cast<plugin_ipc::socket_fd>(::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0));
+     if (server_fd < 0) {
++#else
++    /* macOS has no SOCK_CLOEXEC; set FD_CLOEXEC after a successful socket() below. */
++    plugin_ipc::socket_fd server_fd = static_cast<plugin_ipc::socket_fd>(::socket(AF_UNIX, SOCK_STREAM, 0));
++    if (server_fd < 0) {
+ #endif
+         LOG_ERROR("[spawn] socket() failed for plugin '{}'", plugin_name);
+         return nullptr;
+     }
++#if defined(__APPLE__)
++    ::fcntl(server_fd, F_SETFD, FD_CLOEXEC);
++#endif
+ 
+     sockaddr_un addr{};
+     addr.sun_family = AF_UNIX;
+diff --git a/src/engine/plugin_loader.cc b/src/engine/plugin_loader.cc
+index 0a50b002..a2d8a5ab 100644
+--- a/src/engine/plugin_loader.cc
++++ b/src/engine/plugin_loader.cc
+@@ -123,6 +123,19 @@ static std::string make_crash_js(const mep::crash_event& ev)
+ 
+ void plugin_loader::devtools_connection_hdlr(std::shared_ptr<cdp_client> cdp)
+ {
++#ifdef __APPLE__
++    if (m_cdp) {
++        // The connector has shut down the previous client. Finish its queued
++        // initialization work before replacing the members captured by it.
++        m_thread_pool->shutdown();
++        m_thread_pool = std::make_unique<thread_pool>(2);
++        // A pipe replacement means a new browser, not a Page.reload on the old
++        // connection. Its documents have not received our startup script yet.
++        m_skip_next_inject_reload.store(false, std::memory_order_release);
++        document_script_id.clear();
++        m_shared_js_target_id.clear();
++    }
++#endif
+     m_cdp = cdp;
+     m_socket_con_time = std::chrono::system_clock::now();
+ 
+@@ -591,6 +604,9 @@ void plugin_loader::start_plugin_frontends()
+         logger.log("Steam is shutting down, terminating frontend thread pool...");
+         return;
+     }
++#elif __APPLE__
++    // The macOS connector consumes each new Helper's endpoints itself.
++    return;
+ #endif
+ 
+     logger.warn("Reconnecting to Steam...");
+diff --git a/src/include/mep/sdk_ready_bus.h b/src/include/mep/sdk_ready_bus.h
+index 62aa2b21..1411ed35 100644
+--- a/src/include/mep/sdk_ready_bus.h
++++ b/src/include/mep/sdk_ready_bus.h
+@@ -59,8 +59,8 @@ class sdk_ready_bus
+ 
+     void notify(const sdk_ready_event& ev);
+ 
+-    /* if sdk.ready already fired before this call, the listener is invoked immediately. */
+-    int add_listener(listener_fn fn);
++    // By default, a new listener also receives the last readiness event.
++    int add_listener(listener_fn fn, bool replay_last = true);
+     void remove_listener(int id);
+ 
+     std::optional<sdk_ready_event> get_last() const;
+diff --git a/src/include/millennium/macos_cdp_pipe.h b/src/include/millennium/macos_cdp_pipe.h
+new file mode 100644
+index 00000000..8007fd6e
+--- /dev/null
++++ b/src/include/millennium/macos_cdp_pipe.h
+@@ -0,0 +1,111 @@
++#pragma once
++
++#include <atomic>
++#include <cerrno>
++#include <cstring>
++#include <fcntl.h>
++#include <memory>
++#include <mutex>
++#include <poll.h>
++#include <string>
++#include <sys/socket.h>
++#include <unistd.h>
++
++namespace macos_cdp
++{
++struct broker
++{
++    broker() = default;
++    broker(const broker&) = delete;
++    broker& operator=(const broker&) = delete;
++    int fd = -1;
++    ~broker()
++    {
++        if (fd >= 0) close(fd);
++    }
++};
++
++// A sender can outlive connect_socket. Descriptors are closed only when the last
++// owner releases the connection, never concurrently with a read or write.
++class connection
++{
++  public:
++    const int read_fd;
++    const int write_fd;
++    std::atomic<bool> stopped{ false };
++
++    connection(int read, int write) : read_fd(read), write_fd(write)
++    {
++    }
++    connection(const connection&) = delete;
++    connection& operator=(const connection&) = delete;
++    ~connection()
++    {
++        close(read_fd);
++        close(write_fd);
++    }
++
++    template <typename Cancelled> bool send(const std::string& payload, Cancelled cancelled)
++    {
++        std::lock_guard<std::mutex> lock(send_mutex);
++        const std::string message = payload + '\0';
++        size_t offset = 0;
++        while (offset < message.size() && !stopped.load() && !cancelled()) {
++            const auto count = write(write_fd, message.data() + offset, message.size() - offset);
++            if (count > 0) {
++                offset += static_cast<size_t>(count);
++            } else if (count < 0 && errno == EINTR) {
++                continue;
++            } else if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
++                pollfd wait{ write_fd, POLLOUT, 0 };
++                const int result = poll(&wait, 1, 100);
++                if (result < 0 && errno == EINTR) continue;
++                if (result < 0 || (wait.revents & (POLLERR | POLLHUP | POLLNVAL))) break;
++            } else {
++                break;
++            }
++        }
++        if (offset == message.size()) return true;
++        // A partial frame cannot be retried on this stream.
++        stopped.store(true);
++        return false;
++    }
++
++  private:
++    std::mutex send_mutex;
++};
++
++inline std::shared_ptr<connection> receive(int fd)
++{
++    char byte = 0;
++    iovec iov{ &byte, 1 };
++    alignas(cmsghdr) char control[CMSG_SPACE(2 * sizeof(int))] = {};
++    msghdr msg{};
++    msg.msg_iov = &iov;
++    msg.msg_iovlen = 1;
++    msg.msg_control = control;
++    msg.msg_controllen = sizeof(control);
++    const auto count = recvmsg(fd, &msg, MSG_DONTWAIT);
++    if (count < 0) return {};
++    int endpoints[2] = { -1, -1 };
++    auto* rights = CMSG_FIRSTHDR(&msg);
++    bool expected_rights = false;
++    if (rights && rights->cmsg_level == SOL_SOCKET && rights->cmsg_type == SCM_RIGHTS && rights->cmsg_len >= CMSG_LEN(0)) {
++        const size_t bytes = rights->cmsg_len - CMSG_LEN(0);
++        expected_rights = bytes == sizeof(endpoints);
++        // Close even a partial rights message on rejection.
++        memcpy(endpoints, CMSG_DATA(rights), bytes < sizeof(endpoints) ? bytes : sizeof(endpoints));
++    }
++    bool valid = expected_rights && count == 1 && byte == 1 && !(msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC));
++    for (int endpoint : endpoints) {
++        if (endpoint < 0 || fcntl(endpoint, F_SETFD, FD_CLOEXEC) < 0 || fcntl(endpoint, F_SETFL, O_NONBLOCK) < 0) valid = false;
++    }
++    if (valid) valid = fcntl(endpoints[1], F_SETNOSIGPIPE, 1) == 0;
++    if (!valid) {
++        for (int endpoint : endpoints)
++            if (endpoint >= 0) close(endpoint);
++        return {};
++    }
++    return std::make_shared<connection>(endpoints[0], endpoints[1]);
++}
++} // namespace macos_cdp
+diff --git a/src/instrumentation/internal/loopback_ipc.cc b/src/instrumentation/internal/loopback_ipc.cc
+index 39beb3ce..cc1dba2f 100644
+--- a/src/instrumentation/internal/loopback_ipc.cc
++++ b/src/instrumentation/internal/loopback_ipc.cc
+@@ -43,6 +43,11 @@
+ 
+ #ifdef _WIN32
+ #include <windows.h>
++#elif defined(__APPLE__)
++#include <unistd.h>
++#include <libkern/OSByteOrder.h>
++#define htole32(x) OSSwapHostToLittleInt32(x)
++#define le32toh(x) OSSwapLittleToHostInt32(x)
+ #else
+ #include <unistd.h>
+ #include <endian.h>
+diff --git a/src/instrumentation/internal/steam_hooks.cc b/src/instrumentation/internal/steam_hooks.cc
+index 51f9509e..c965f3ea 100644
+--- a/src/instrumentation/internal/steam_hooks.cc
++++ b/src/instrumentation/internal/steam_hooks.cc
+@@ -794,9 +794,6 @@ bool initialize_steam_hooks()
+ 
+ bool initialize_steam_hooks()
+ {
+-    const char* configured_port = std::getenv("MILLENNIUM_DEBUG_PORT");
+-    std::string debugger_port = (configured_port && configured_port[0] != '\0') ? configured_port : DEFAULT_DEVTOOLS_PORT;
+-
+     std::filesystem::path helper_hook_path;
+     std::filesystem::path child_hook_path;
+ 
+@@ -848,7 +845,7 @@ bool initialize_steam_hooks()
+         return false;
+     }
+ 
+-    logger.log("Using bootstrap-based Steam Helper injection on macOS with debugger port {}", debugger_port);
++    logger.log("Using bootstrap-based Steam Helper injection on macOS with CDP pipes");
+     return true;
+ }
+ #endif
+diff --git a/src/instrumentation/loopback/src/url.rs b/src/instrumentation/loopback/src/url.rs
+index dab4b1a5..772cb71d 100644
+--- a/src/instrumentation/loopback/src/url.rs
++++ b/src/instrumentation/loopback/src/url.rs
+@@ -74,7 +74,7 @@ fn steam_install_path() -> PathBuf {
+ }
+ 
+ #[cfg(target_os = "macos")]
+-fn steam_install_path() {
++fn steam_install_path() -> PathBuf {
+     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".into());
+     PathBuf::from(home).join("Library/Application Support/Steam")
+ }
+diff --git a/src/mep/mep_hooks.cc b/src/mep/mep_hooks.cc
+index 75f535c5..a6c5dbe7 100644
+--- a/src/mep/mep_hooks.cc
++++ b/src/mep/mep_hooks.cc
+@@ -688,10 +688,10 @@ void register_mep_handlers(router& router, std::shared_ptr<plugin_loader> loader
+             auto ctx_s = ctx_weak.lock();
+             if (!ctx_s) return;
+             ctx_s->push({
+-                { "type",            "event"                    },
+-                { "subscription_id", captured_sub_id            },
+-                { "plugin",          captured_name              },
+-                { "data",            normalize_patch_entry(ev)  },
++                { "type",            "event"                   },
++                { "subscription_id", captured_sub_id           },
++                { "plugin",          captured_name             },
++                { "data",            normalize_patch_entry(ev) },
+             });
+         });
+         state->patch_listener_id.store(patch_id);
+@@ -773,9 +773,12 @@ void register_mep_handlers(router& router, std::shared_ptr<plugin_loader> loader
+     router.register_handler("sdk.ready", [](const request_t& req, const std::shared_ptr<client_context>& ctx)
+     {
+         if (!ctx) return response_t::err(req.id, "sdk.ready requires a live connection");
++        if (!req.params.is_null() && !req.params.is_object()) return response_t::err(req.id, "sdk.ready params must be an object");
++        if (req.params.contains("replay") && !req.params["replay"].is_boolean()) return response_t::err(req.id, "sdk.ready replay must be a boolean");
++        const bool replay = req.params.is_null() || req.params.value("replay", true);
+ 
+         auto& bus = sdk_ready_bus::instance();
+-        const auto last = bus.get_last();
++        const auto last = replay ? bus.get_last() : std::nullopt;
+ 
+         auto cancelled = std::make_shared<std::atomic<bool>>(false);
+         auto listener_id_r = std::make_shared<std::atomic<int>>(-1);
+@@ -801,12 +804,13 @@ void register_mep_handlers(router& router, std::shared_ptr<plugin_loader> loader
+                 { "subscription_id", captured_sub_id                                                                        },
+                 { "data",            { { "millennium_version", ev.millennium_version }, { "sdk_version", ev.sdk_version } } },
+             });
+-        });
++        }, replay);
+ 
+         listener_id_r->store(id);
+ 
+         const json params = {
+             { "subscription_id", sub_id                                                                                                                  },
++            { "replay",          replay                                                                                                                  },
+             { "ready",           last ? json{ { "millennium_version", last->millennium_version }, { "sdk_version", last->sdk_version } } : json(nullptr) },
+         };
+         return response_t::ok(req.id, params);
+diff --git a/src/mep/mep_server.cc b/src/mep/mep_server.cc
+index 0908db16..bf9c0d5e 100644
+--- a/src/mep/mep_server.cc
++++ b/src/mep/mep_server.cc
+@@ -34,12 +34,16 @@
+ #include <winsock2.h>
+ #include <afunix.h>
+ #pragma comment(lib, "ws2_32.lib")
+-#else
+-#if defined(__APPLE__)
+-#include <sys/endian.h>
++#elif defined(__APPLE__)
++#include <libkern/OSByteOrder.h>
++#define htole32(x) OSSwapHostToLittleInt32(x)
++#define le32toh(x) OSSwapLittleToHostInt32(x)
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <unistd.h>
+ #else
+ #include <endian.h>
+-#endif
+ #include <fcntl.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+diff --git a/src/mep/sdk_ready_bus.cc b/src/mep/sdk_ready_bus.cc
+index 732cbede..04fb8978 100644
+--- a/src/mep/sdk_ready_bus.cc
++++ b/src/mep/sdk_ready_bus.cc
+@@ -59,7 +59,7 @@ void sdk_ready_bus::notify(const sdk_ready_event& ev)
+     }
+ }
+ 
+-int sdk_ready_bus::add_listener(listener_fn fn)
++int sdk_ready_bus::add_listener(listener_fn fn, bool replay_last)
+ {
+     std::optional<sdk_ready_event> replay;
+     int id;
+@@ -67,7 +67,7 @@ int sdk_ready_bus::add_listener(listener_fn fn)
+         std::lock_guard<std::mutex> lock(m_mutex);
+         id = ++m_id_counter;
+         m_listeners[id] = fn;
+-        replay = m_last;
++        if (replay_last) replay = m_last;
+     }
+     /* replay immediately if the event already fired before this listener registered */
+     if (replay) {
+diff --git a/src/util/file_watcher.cc b/src/util/file_watcher.cc
+index 5d8cb89d..955c7e39 100644
+--- a/src/util/file_watcher.cc
++++ b/src/util/file_watcher.cc
+@@ -1,6 +1,6 @@
+ #include "millennium/file_watcher.h"
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__APPLE__)
+ #include <sys/inotify.h>
+ #include <unistd.h>
+ #include <poll.h>
+@@ -105,6 +105,39 @@ void file_watcher::watch_loop()
+     CloseHandle(m_dir_handle);
+     m_dir_handle = INVALID_HANDLE_VALUE;
+ }
++#elif defined(__APPLE__)
++void file_watcher::watch_loop()
++{
++    /* macOS has no inotify; poll last_write_time on an interval. The debounce
++       window collapses a burst of writes into a single on_change callback. */
++    auto lastModTime = std::filesystem::exists(m_file_path) ? std::filesystem::last_write_time(m_file_path) : std::filesystem::file_time_type{};
++
++    const auto pollInterval = std::chrono::milliseconds(500);
++
++    while (m_running.load()) {
++        std::this_thread::sleep_for(pollInterval);
++        if (!m_running.load()) break;
++        if (!std::filesystem::exists(m_file_path)) continue;
++
++        auto currentModTime = std::filesystem::last_write_time(m_file_path);
++        if (currentModTime == lastModTime) continue;
++
++        /* debounce: let a burst of writes settle before firing */
++        while (m_running.load()) {
++            std::this_thread::sleep_for(m_debounce);
++            if (!std::filesystem::exists(m_file_path)) break;
++            auto settledModTime = std::filesystem::last_write_time(m_file_path);
++            if (settledModTime == currentModTime) break;
++            currentModTime = settledModTime;
++        }
++
++        /* only fire if the file still exists, matching the inotify branch */
++        if (m_running.load() && std::filesystem::exists(m_file_path)) {
++            lastModTime = std::filesystem::last_write_time(m_file_path);
++            if (m_on_change) m_on_change();
++        }
++    }
++}
+ #else
+ void file_watcher::watch_loop()
+ {
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 49c85aee..0f8122e3 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -27,6 +27,9 @@ endif()
+ 
+ if(MILLENNIUM_RUN_TESTS_ON_BUILD)
+     set(_run_tests_deps millennium_cpp_tests millennium_cdp_shutdown_test)
++    if(TARGET millennium_macos_connector_tests)
++        list(APPEND _run_tests_deps millennium_macos_connector_tests)
++    endif()
+     if(UNIX)
+         list(APPEND _run_tests_deps millennium_posix_lifecycle_test millennium_logger_concurrency_test millennium_child_shutdown_test)
+     endif()
+diff --git a/tests/cpp/CMakeLists.txt b/tests/cpp/CMakeLists.txt
+index 3086c54f..4f18f226 100644
+--- a/tests/cpp/CMakeLists.txt
++++ b/tests/cpp/CMakeLists.txt
+@@ -1,11 +1,16 @@
+ set(TEST_SOURCES
+   ffi_recorder_test.cc
+   test_target_url.cc
++  test_sdk_ready.cc
+   ${CMAKE_SOURCE_DIR}/src/mep/ffi_recorder.cc
+   ${CMAKE_SOURCE_DIR}/src/engine/target_url.cc
++  ${CMAKE_SOURCE_DIR}/src/mep/sdk_ready_bus.cc
+ )
+ 
+ add_executable(millennium_cpp_tests ${TEST_SOURCES})
++if(APPLE)
++  target_sources(millennium_cpp_tests PRIVATE test_macos_cdp_pipe.cc)
++endif()
+ target_compile_features(millennium_cpp_tests PRIVATE cxx_std_23)
+ 
+ target_include_directories(millennium_cpp_tests PRIVATE
+@@ -27,5 +32,19 @@ if(UNIX)
+ endif()
+ 
+ add_executable(sdk_health sdk_health.cc)
+-target_compile_features(sdk_health PRIVATE cxx_std_17)
++target_compile_features(sdk_health PRIVATE cxx_std_23)
+ target_link_libraries(sdk_health PRIVATE nlohmann_json::nlohmann_json)
++
++if(APPLE AND MILLENNIUM_BUILD_MAIN)
++  add_executable(millennium_macos_connector_tests test_macos_cdp_connector.cc)
++  target_compile_features(millennium_macos_connector_tests PRIVATE cxx_std_23)
++  target_include_directories(millennium_macos_connector_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
++  target_link_libraries(millennium_macos_connector_tests PRIVATE Millennium Catch2::Catch2WithMain nlohmann_json::nlohmann_json)
++  # Each connector test owns the process-wide broker and termination state.
++  foreach(test_name IN ITEMS
++      "macOS connector exits without a Helper"
++      "macOS failed handoff preserves the current Helper connection")
++    add_test(NAME "${test_name}" COMMAND millennium_macos_connector_tests "${test_name}")
++    set_tests_properties("${test_name}" PROPERTIES TIMEOUT 15)
++  endforeach()
++endif()
+diff --git a/tests/cpp/sdk_health.cc b/tests/cpp/sdk_health.cc
+index d062ae3a..f876b6b9 100644
+--- a/tests/cpp/sdk_health.cc
++++ b/tests/cpp/sdk_health.cc
+@@ -28,7 +28,7 @@
+  * SOFTWARE.
+  */
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__APPLE__)
+ #include <fcntl.h>
+ #include <nlohmann/json.hpp>
+ #include <poll.h>
+@@ -40,6 +40,7 @@
+ #include <unistd.h>
+ 
+ #include <chrono>
++#include <deque>
+ #include <cstring>
+ #include <filesystem>
+ #include <fstream>
+@@ -55,6 +56,7 @@ using steady = std::chrono::steady_clock;
+ using tp = steady::time_point;
+ 
+ static int g_req_id = 0;
++static std::deque<json> pending_events;
+ 
+ static std::string next_id()
+ {
+@@ -75,9 +77,18 @@ static bool recv_exact(int fd, void* buf, size_t n, tp deadline)
+         int ms = ms_left(deadline);
+         if (ms == 0) return false;
+         struct pollfd pfd = { fd, POLLIN, 0 };
+-        if (poll(&pfd, 1, ms) <= 0) return false;
++        const int ready = poll(&pfd, 1, ms);
++        if (ready < 0 && errno == EINTR) continue;
++        if (ready <= 0) {
++            std::println(stderr, "MEP read {}", ready == 0 ? "timed out" : strerror(errno));
++            return false;
++        }
+         ssize_t r = read(fd, ptr + got, n - got);
+-        if (r <= 0) return false;
++        if (r < 0 && errno == EINTR) continue;
++        if (r <= 0) {
++            std::println(stderr, "MEP connection {}", r == 0 ? "closed" : strerror(errno));
++            return false;
++        }
+         got += static_cast<size_t>(r);
+     }
+     return true;
+@@ -88,11 +99,16 @@ static std::optional<json> recv_frame(int fd, tp deadline)
+     uint8_t len_buf[4];
+     if (!recv_exact(fd, len_buf, 4, deadline)) return std::nullopt;
+     uint32_t len = len_buf[0] | (uint32_t(len_buf[1]) << 8) | (uint32_t(len_buf[2]) << 16) | (uint32_t(len_buf[3]) << 24);
++    if (len == 0 || len > 4 * 1024 * 1024) {
++        std::println(stderr, "Invalid MEP frame length: {}", len);
++        return std::nullopt;
++    }
+     std::vector<uint8_t> payload(len);
+     if (!recv_exact(fd, payload.data(), len, deadline)) return std::nullopt;
+     try {
+         return json::from_msgpack(payload);
+-    } catch (...) {
++    } catch (const std::exception& error) {
++        std::println(stderr, "Invalid MEP message: {}", error.what());
+         return std::nullopt;
+     }
+ }
+@@ -119,9 +135,14 @@ static std::optional<json> mep_request(int fd, const std::string& method, const
+         { "params", params    }
+     };
+     if (!send_frame(fd, req)) return std::nullopt;
+-    return recv_frame(fd, deadline);
++    while (auto frame = recv_frame(fd, deadline)) {
++        if (frame->value("id", "") == req["id"].get<std::string>()) return frame;
++        if (frame->value("type", "") == "event") pending_events.push_back(std::move(*frame));
++    }
++    return std::nullopt;
+ }
+ 
++#ifdef __linux__
+ static void kill_existing_steam()
+ {
+     if (system("pkill -x steam > /dev/null 2>&1") == 0) {
+@@ -182,6 +203,7 @@ static pid_t launch_steam()
+     std::thread(stream_prefixed, pipefd[0], "[steam] ").detach();
+     return pid;
+ }
++#endif
+ 
+ static bool wait_for_socket(const std::string& path, int timeout_secs)
+ {
+@@ -224,6 +246,7 @@ int main(int argc, char* argv[])
+     std::string dump_file = "/tmp/sdk-health-dump.json";
+     double timeout_sec = 60.0;
+     bool no_launch = false;
++    bool fresh = false;
+ 
+     for (int i = 1; i < argc; ++i) {
+         std::string arg = argv[i];
+@@ -235,11 +258,20 @@ int main(int argc, char* argv[])
+             timeout_sec = std::stod(argv[++i]);
+         else if (arg == "--no-launch")
+             no_launch = true;
++        else if (arg == "--fresh")
++            fresh = true;
+     }
+ 
+     pid_t steam_pid = -1;
+     int sock_fd = -1;
+ 
++#ifdef __APPLE__
++    if (!no_launch) {
++        std::println(stderr, "On macOS, launch the test Steam session separately and use --no-launch.");
++        return 1;
++    }
++#endif
++
+     auto cleanup = [&]()
+     {
+         if (sock_fd >= 0) {
+@@ -262,7 +294,9 @@ int main(int argc, char* argv[])
+                 steam_pid = -1;
+             }
+         }
+-        kill_existing_steam();
++#ifdef __linux__
++        if (!no_launch) kill_existing_steam();
++#endif
+     };
+ 
+     signal(SIGTERM, [](int)
+@@ -270,11 +304,14 @@ int main(int argc, char* argv[])
+         exit(1);
+     });
+ 
++#ifdef __linux__
+     if (!no_launch) {
+         kill_existing_steam();
+         unlink(mep_socket.c_str());
+         steam_pid = launch_steam();
++        if (steam_pid < 0) return 1;
+     }
++#endif
+ 
+     std::print("waiting to connect to MEP...");
+     if (!wait_for_socket(mep_socket, 30)) {
+@@ -312,13 +349,20 @@ int main(int argc, char* argv[])
+     }
+     const std::string exc_sub_id = (*exc_resp)["result"]["subscription_id"].get<std::string>();
+ 
+-    auto ready_resp = mep_request(sock_fd, "sdk.ready", nullptr, race_deadline);
++    const json ready_params = fresh ? json{ { "replay", false } } : json(nullptr);
++    auto ready_resp = mep_request(sock_fd, "sdk.ready", ready_params, race_deadline);
+     if (!ready_resp || !(*ready_resp)["error"].is_null()) {
+         std::println(stderr, "FAIL: sdk.ready subscribe error");
+         cleanup();
+         return 1;
+     }
+ 
++    if (fresh && (*ready_resp)["result"].value("replay", true)) {
++        std::println(stderr, "FAIL: runtime does not support sdk.ready without replay");
++        cleanup();
++        return 1;
++    }
++
+     auto on_sdk_ready = [&](const json& data) -> int
+     {
+         const std::string sdk_ver = data.value("sdk_version", "unknown");
+@@ -330,13 +374,20 @@ int main(int argc, char* argv[])
+         return rc;
+     };
+ 
+-    if (!(*ready_resp)["result"]["ready"].is_null()) return on_sdk_ready((*ready_resp)["result"]["ready"]);
++    if (!fresh && !(*ready_resp)["result"]["ready"].is_null()) return on_sdk_ready((*ready_resp)["result"]["ready"]);
+ 
+     const std::string ready_sub_id = (*ready_resp)["result"]["subscription_id"].get<std::string>();
+     std::println("subscribed exceptions={}#ready={}. waiting ...", exc_sub_id, ready_sub_id);
++    std::fflush(stdout);
+ 
+     while (ms_left(race_deadline) > 0) {
+-        auto event = recv_frame(sock_fd, race_deadline);
++        std::optional<json> event;
++        if (!pending_events.empty()) {
++            event = std::move(pending_events.front());
++            pending_events.pop_front();
++        } else {
++            event = recv_frame(sock_fd, race_deadline);
++        }
+         if (!event) break;
+ 
+         auto& ev = *event;
+@@ -368,7 +419,7 @@ int main(int argc, char* argv[])
+         }
+     }
+ 
+-    std::println(stderr, "FAIL: timed out after {}s waiting for sdk.ready", timeout_sec);
++    std::println(stderr, "FAIL: SDK readiness was not confirmed (timeout or transport failure)");
+     cleanup();
+     return 1;
+ }
+diff --git a/tests/cpp/test_cdp_shutdown.cc b/tests/cpp/test_cdp_shutdown.cc
+new file mode 100644
+index 00000000..1ffdd4ec
+--- /dev/null
++++ b/tests/cpp/test_cdp_shutdown.cc
+@@ -0,0 +1,69 @@
++#include <catch2/catch_test_macros.hpp>
++#include "millennium/cdp_api.h"
++#include <future>
++
++using namespace std::chrono_literals;
++
++TEST_CASE("CDP shutdown resolves requests before joining callbacks", "[cdp][shutdown]")
++{
++    std::promise<void> entered;
++    auto waiting = entered.get_future();
++    std::atomic<bool> failed{ false };
++    auto client = std::make_shared<cdp_client>([](const std::string&)
++    {
++        return true;
++    });
++    client->on("test.wait", [&](const json&)
++    {
++        auto request = client->send_host("test.pending", json::object(), std::nullopt, 3s);
++        entered.set_value();
++        try {
++            (void)request.get();
++        } catch (const std::exception&) {
++            failed.store(true);
++        }
++    });
++    client->handle_message(R"({"method":"test.wait","params":{}})");
++    REQUIRE(waiting.wait_for(2s) == std::future_status::ready);
++    auto shutdown = std::async(std::launch::async, [&]
++    {
++        client->shutdown();
++    });
++    REQUIRE(shutdown.wait_for(1s) == std::future_status::ready);
++    shutdown.get();
++    REQUIRE(failed.load());
++}
++
++TEST_CASE("CDP queued sends do not enter the transport after shutdown", "[cdp][shutdown]")
++{
++    std::promise<void> entered;
++    auto started = entered.get_future();
++    std::promise<void> release;
++    auto released = release.get_future().share();
++    std::atomic<int> calls{ 0 };
++    auto client = std::make_shared<cdp_client>([&](const std::string&)
++    {
++        if (++calls == 1) {
++            entered.set_value();
++            released.wait_for(3s);
++        }
++        return true;
++    });
++    auto first = std::async(std::launch::async, [&]
++    {
++        return client->send_host("first");
++    });
++    REQUIRE(started.wait_for(1s) == std::future_status::ready);
++    auto second = std::async(std::launch::async, [&]
++    {
++        return client->send_host("second");
++    });
++    REQUIRE(second.wait_for(100ms) == std::future_status::timeout);
++    client->shutdown();
++    release.set_value();
++    auto first_result = first.get();
++    auto second_result = second.get();
++    REQUIRE_THROWS(first_result.get());
++    REQUIRE_THROWS(second_result.get());
++    REQUIRE(calls.load() == 1);
++}
+diff --git a/tests/cpp/test_macos_cdp_connector.cc b/tests/cpp/test_macos_cdp_connector.cc
+new file mode 100644
+index 00000000..b517a9aa
+--- /dev/null
++++ b/tests/cpp/test_macos_cdp_connector.cc
+@@ -0,0 +1,178 @@
++#include <catch2/catch_test_macros.hpp>
++#include "millennium/cdp_connector.h"
++#include "millennium/millennium_lifecycle.h"
++#include <atomic>
++#include <cstring>
++#include <future>
++#include <poll.h>
++#include <sys/socket.h>
++#include <thread>
++#include <unistd.h>
++
++extern "C" int MillenniumAcceptPipeBroker(int);
++
++namespace
++{
++struct connector_session
++{
++    int broker[2]{ -1, -1 };
++    std::thread worker;
++    std::atomic<int> connections{ 0 };
++    std::promise<void> entered;
++    std::promise<void> finished;
++    std::future<void> started = entered.get_future();
++    std::future<void> stopped = finished.get_future();
++    std::promise<std::shared_ptr<cdp_client>> first_connection;
++    std::future<std::shared_ptr<cdp_client>> client = first_connection.get_future();
++
++    connector_session()
++    {
++        REQUIRE(socketpair(AF_UNIX, SOCK_DGRAM, 0, broker) == 0);
++        REQUIRE(MillenniumAcceptPipeBroker(broker[0]) == 0);
++    }
++
++    void start()
++    {
++        auto props = std::make_shared<socket_utils::socket_t>();
++        props->name = "test";
++        props->on_connect = [this](auto client)
++        {
++            if (++connections == 1) first_connection.set_value(client);
++            (void)client->send_host("test.connected");
++        };
++        worker = std::thread([this, props]
++        {
++            entered.set_value();
++            socket_utils().connect_socket(props);
++            finished.set_value();
++        });
++    }
++
++    ~connector_session()
++    {
++        millennium_lifecycle::get().terminate.notify();
++        if (worker.joinable()) worker.join();
++        for (int fd : broker)
++            if (fd >= 0) close(fd);
++    }
++};
++
++struct helper_pipe
++{
++    int input[2]{ -1, -1 };
++    int output[2]{ -1, -1 };
++
++    helper_pipe()
++    {
++        REQUIRE(pipe(input) == 0);
++        REQUIRE(pipe(output) == 0);
++    }
++
++    ~helper_pipe()
++    {
++        for (int fd : input)
++            if (fd >= 0) close(fd);
++        for (int fd : output)
++            if (fd >= 0) close(fd);
++    }
++
++    void handoff(int broker)
++    {
++        char byte = 1;
++        iovec iov{ &byte, 1 };
++        alignas(cmsghdr) char control[CMSG_SPACE(2 * sizeof(int))]{};
++        msghdr msg{};
++        msg.msg_iov = &iov;
++        msg.msg_iovlen = 1;
++        msg.msg_control = control;
++        msg.msg_controllen = sizeof(control);
++        auto* rights = CMSG_FIRSTHDR(&msg);
++        rights->cmsg_level = SOL_SOCKET;
++        rights->cmsg_type = SCM_RIGHTS;
++        rights->cmsg_len = CMSG_LEN(2 * sizeof(int));
++        const int endpoints[]{ output[0], input[1] };
++        memcpy(CMSG_DATA(rights), endpoints, sizeof(endpoints));
++        REQUIRE(sendmsg(broker, &msg, 0) == 1);
++        close(output[0]);
++        close(input[1]);
++        output[0] = input[1] = -1;
++    }
++
++    json read_message()
++    {
++        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
++        std::string message;
++        while (std::chrono::steady_clock::now() < deadline) {
++            pollfd ready{ input[0], POLLIN, 0 };
++            const int result = poll(&ready, 1, 100);
++            if (result < 0 && errno == EINTR) continue;
++            REQUIRE(result >= 0);
++            if (!result) continue;
++            char byte;
++            const auto count = read(input[0], &byte, 1);
++            if (count < 0 && errno == EINTR) continue;
++            REQUIRE(count == 1);
++            if (byte == '\0') return json::parse(message);
++            message += byte;
++        }
++        FAIL("Timed out waiting for a CDP frame");
++        return {};
++    }
++
++    void respond(const json& request)
++    {
++        const std::string response = json{
++            { "id",     request.at("id")      },
++            { "result", { { "alive", true } } }
++        }.dump() + '\0';
++        REQUIRE(write(output[1], response.data(), response.size()) == static_cast<ssize_t>(response.size()));
++    }
++
++    void exit()
++    {
++        close(output[1]);
++        close(input[0]);
++        output[1] = input[0] = -1;
++    }
++};
++} // namespace
++
++TEST_CASE("macOS connector exits without a Helper", "[macos][cdp]")
++{
++    connector_session session;
++    session.start();
++    REQUIRE(session.started.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
++    REQUIRE(session.stopped.wait_for(std::chrono::milliseconds(150)) == std::future_status::timeout);
++    REQUIRE(session.connections.load() == 0);
++    millennium_lifecycle::get().terminate.notify();
++    REQUIRE(session.stopped.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
++    session.worker.join();
++}
++
++TEST_CASE("macOS failed handoff preserves the current Helper connection", "[macos][cdp]")
++{
++    connector_session session;
++    helper_pipe original;
++    original.handoff(session.broker[1]);
++    session.start();
++    REQUIRE(original.read_message().at("method") == "test.connected");
++    REQUIRE(session.client.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
++    auto client = session.client.get();
++
++    helper_pipe failed;
++    failed.handoff(session.broker[1]);
++    failed.exit();
++    std::this_thread::sleep_for(std::chrono::milliseconds(250));
++    REQUIRE(session.connections.load() == 1);
++    auto response = client->send_host("test.still_connected");
++    const auto request = original.read_message();
++    REQUIRE(request.at("method") == "test.still_connected");
++    original.respond(request);
++    REQUIRE(response.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
++    REQUIRE(response.get().at("alive") == true);
++
++    helper_pipe replacement;
++    replacement.handoff(session.broker[1]);
++    original.exit();
++    REQUIRE(replacement.read_message().at("method") == "test.connected");
++}
+diff --git a/tests/cpp/test_macos_cdp_pipe.cc b/tests/cpp/test_macos_cdp_pipe.cc
+new file mode 100644
+index 00000000..53b29ddb
+--- /dev/null
++++ b/tests/cpp/test_macos_cdp_pipe.cc
+@@ -0,0 +1,157 @@
++#include <catch2/catch_test_macros.hpp>
++#include "bootstrap/macos/pipe_bootstrap.h"
++#include "millennium/macos_cdp_pipe.h"
++#include <chrono>
++#include <future>
++#include <sys/wait.h>
++
++namespace
++{
++struct pipe_pair
++{
++    int input[2];
++    int output[2];
++    std::shared_ptr<macos_cdp::connection> conn;
++    pipe_pair()
++    {
++        REQUIRE(pipe(input) == 0);
++        REQUIRE(pipe(output) == 0);
++        REQUIRE(fcntl(input[1], F_SETFL, O_NONBLOCK) == 0);
++        REQUIRE(fcntl(input[1], F_SETNOSIGPIPE, 1) == 0);
++        conn = std::make_shared<macos_cdp::connection>(output[0], input[1]);
++    }
++    ~pipe_pair()
++    {
++        if (input[0] >= 0) close(input[0]);
++        close(output[1]);
++    }
++};
++} // namespace
++
++TEST_CASE("macOS CDP targets only the browser Helper", "[macos][cdp]")
++{
++    char name[] = "Steam Helper";
++    char type[] = "--type=renderer";
++    char* browser[] = { name, nullptr };
++    char* renderer[] = { name, type, nullptr };
++    REQUIRE(millennium_pipe_bootstrap::is_browser("/path/Steam Helper", browser));
++    REQUIRE_FALSE(millennium_pipe_bootstrap::is_browser("/path/Steam Helper", renderer));
++    REQUIRE_FALSE(millennium_pipe_bootstrap::is_browser("/path/Steam Helper (Renderer)", browser));
++    REQUIRE_FALSE(millennium_pipe_bootstrap::is_browser("/bin/sh", browser));
++}
++
++TEST_CASE("macOS pipe writes complete null-delimited frames", "[macos][cdp]")
++{
++    pipe_pair pipes;
++    const std::string payload(256 * 1024, 'x');
++    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
++    auto reader = std::async(std::launch::async, [&]()
++    {
++        std::string result;
++        char chunk[137];
++        while (result.size() < payload.size() + 1) {
++            pollfd ready{ pipes.input[0], POLLIN, 0 };
++            if (poll(&ready, 1, 3000) <= 0) break;
++            const auto count = read(pipes.input[0], chunk, sizeof(chunk));
++            if (count <= 0) break;
++            result.append(chunk, count);
++        }
++        return result;
++    });
++    REQUIRE(pipes.conn->send(payload, [&]
++    {
++        return std::chrono::steady_clock::now() >= deadline;
++    }));
++    REQUIRE(reader.get() == payload + '\0');
++}
++
++TEST_CASE("macOS pipe backpressure is cancellable", "[macos][cdp]")
++{
++    pipe_pair pipes;
++    std::atomic<bool> cancel{ false };
++    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
++    auto send = std::async(std::launch::async, [&]()
++    {
++        return pipes.conn->send(std::string(1024 * 1024, 'x'), [&]
++        {
++            return cancel.load() || std::chrono::steady_clock::now() >= deadline;
++        });
++    });
++    REQUIRE(send.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
++    cancel.store(true);
++    REQUIRE(send.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
++    REQUIRE_FALSE(send.get());
++    REQUIRE(pipes.conn->stopped.load());
++    REQUIRE_FALSE(pipes.conn->send("next", []
++    {
++        return false;
++    }));
++}
++
++TEST_CASE("macOS closed pipe fails without SIGPIPE", "[macos][cdp]")
++{
++    pipe_pair pipes;
++    close(pipes.input[0]);
++    pipes.input[0] = -1;
++    REQUIRE_FALSE(pipes.conn->send("request", []
++    {
++        return false;
++    }));
++}
++
++TEST_CASE("macOS Helper launch hands off fresh descriptors and restores failed exec", "[macos][cdp]")
++{
++    int channel[2];
++    REQUIRE(socketpair(AF_UNIX, SOCK_DGRAM, 0, channel) == 0);
++    channel[0] = millennium_pipe_bootstrap::private_fd(channel[0]);
++    channel[1] = millennium_pipe_bootstrap::private_fd(channel[1]);
++    REQUIRE(channel[0] >= 0);
++    REQUIRE(channel[1] >= 0);
++    millennium_pipe_bootstrap::sender = channel[1];
++    millennium_pipe_bootstrap::owner = getpid();
++    for (int generation = 0; generation < 2; ++generation) {
++        const pid_t child = fork();
++        REQUIRE(child >= 0);
++        if (child == 0) {
++            alarm(5);
++            int original = open("/dev/null", O_RDWR);
++            if (original < 0 || dup2(original, 3) < 0 || dup2(original, 4) < 0) _exit(1);
++            if (original > 4) close(original);
++            fcntl(3, F_SETFD, FD_CLOEXEC);
++            char name[] = "Steam Helper";
++            char* argv[] = { name, nullptr };
++            const int result = millennium_pipe_bootstrap::exec("/test/Steam Helper", argv, nullptr, [](const char*, char* const args[], char* const[])
++            {
++                if (!args[1] || strcmp(args[1], "--remote-debugging-pipe") != 0) _exit(2);
++                if (fcntl(3, F_GETFD) != 0 || fcntl(4, F_GETFD) != 0) _exit(3);
++                char byte;
++                if (read(3, &byte, 1) != 1 || write(4, &byte, 1) != 1) _exit(4);
++                errno = ENOENT;
++                return -1;
++            });
++            if (result != -1 || errno != ENOENT || fcntl(3, F_GETFD) != FD_CLOEXEC) _exit(5);
++            char byte;
++            if (read(3, &byte, 1) != 0 || write(4, "x", 1) != 1) _exit(6);
++            _exit(0);
++        }
++        pollfd ready{ channel[0], POLLIN, 0 };
++        REQUIRE(poll(&ready, 1, 3000) == 1);
++        auto conn = macos_cdp::receive(channel[0]);
++        REQUIRE(conn);
++        REQUIRE(conn->send("x", []
++        {
++            return false;
++        }));
++        pollfd response{ conn->read_fd, POLLIN, 0 };
++        REQUIRE(poll(&response, 1, 3000) == 1);
++        char byte;
++        REQUIRE(read(conn->read_fd, &byte, 1) == 1);
++        REQUIRE(byte == 'x');
++        int status;
++        REQUIRE(waitpid(child, &status, 0) == child);
++        REQUIRE(WIFEXITED(status));
++        REQUIRE(WEXITSTATUS(status) == 0);
++    }
++    close(channel[0]);
++    millennium_pipe_bootstrap::shutdown();
++}
+diff --git a/tests/cpp/test_sdk_ready.cc b/tests/cpp/test_sdk_ready.cc
+new file mode 100644
+index 00000000..07368f0e
+--- /dev/null
++++ b/tests/cpp/test_sdk_ready.cc
+@@ -0,0 +1,37 @@
++#include <catch2/catch_test_macros.hpp>
++#include "mep/sdk_ready_bus.h"
++
++TEST_CASE("SDK readiness replays the last event by default", "[sdk][ready]")
++{
++    auto& bus = mep::sdk_ready_bus::instance();
++    bus.notify({ "cached-sdk", "runtime" });
++    std::vector<std::string> received;
++    const int listener = bus.add_listener([&](const auto& event)
++    {
++        received.push_back(event.sdk_version);
++    });
++    bus.notify({ "new-sdk", "runtime" });
++    bus.remove_listener(listener);
++    bus.notify({ "after-unsubscribe", "runtime" });
++
++    REQUIRE(received == std::vector<std::string>{ "cached-sdk", "new-sdk" });
++}
++
++TEST_CASE("SDK readiness without replay delivers only new events", "[sdk][ready]")
++{
++    auto& bus = mep::sdk_ready_bus::instance();
++    bus.notify({ "cached-sdk", "runtime" });
++    std::vector<std::string> received;
++    const int listener = bus.add_listener([&](const auto& event)
++    {
++        received.push_back(event.sdk_version);
++    }, false);
++    const bool replayed = !received.empty();
++    bus.notify({ "new-sdk", "runtime" });
++    bus.remove_listener(listener);
++    bus.notify({ "after-unsubscribe", "runtime" });
++
++    REQUIRE_FALSE(replayed);
++    REQUIRE(received == std::vector<std::string>{ "new-sdk" });
++    REQUIRE(bus.get_last()->sdk_version == "after-unsubscribe");
++}

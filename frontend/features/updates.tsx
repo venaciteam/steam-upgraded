@@ -7,6 +7,7 @@ import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { setSetting, useSettings } from '../core/settings';
 import { openSteamWeb } from '../core/steam';
 import { PLUGIN_ID, restartInterface, selfInfo } from './uninstall';
+import { PINNED, disableMillenniumSelfUpdate, installMillennium, installableAsset, matchesPinned, releaseLock, restartSteam, runningMillennium, useMillenniumState, refreshMillenniumState } from './millennium';
 
 export type Release = { tag: string; version: string; name?: string; published?: string; url?: string; notes: string; star?: string; sha256?: string };
 
@@ -59,6 +60,8 @@ let started = false;
 export function initUpdates() {
 	if (started) return;
 	started = true;
+	// Millennium ne change de version qu'avec Steam Upgraded (voir millennium.ts)
+	disableMillenniumSelfUpdate();
 	setTimeout(checkForUpdate, 30_000);
 	setInterval(checkForUpdate, 6 * 3600_000);
 }
@@ -115,10 +118,25 @@ async function install(r: Release): Promise<void> {
 	const me = await selfInfo();
 	if (!me?.path) throw new Error('Millennium ne trouve pas le plugin.');
 	if (!r.star || !r.sha256) throw new Error('Cette publication ne donne pas l’empreinte de son fichier : installez-la avec l’installeur.');
+	// Version de Millennium testée avec la nouvelle version (absente pour les publications d'avant le figeage)
+	const lock = await releaseLock(r.tag);
 	const d = parse(await backend.sp_update_install(me.path, r.star, r.sha256, me.version));
 	if (!d?.ok) throw new Error(d?.error || 'Mise à jour impossible.');
+	const run = await runningMillennium();
+	if (lock && run.version && !sameVersion(lock.version, run.version) && installableAsset(lock, run.platform)) {
+		try {
+			await installMillennium(lock);
+		} catch (e: any) {
+			await reloadPlugin();
+			throw new Error(`Steam Upgraded ${r.version} est installé, mais pas Millennium ${lock.version} : ${e?.message || e} Réessayez depuis la section Millennium.`);
+		}
+		restartSteam();
+		return;
+	}
 	await reloadPlugin();
 }
+
+const sameVersion = (a: string, b: string) => a.replace(/^v/i, '') === b.replace(/^v/i, '');
 
 async function rollback(): Promise<void> {
 	const me = await selfInfo();
@@ -237,6 +255,8 @@ export function UpdateSections({ Section }: { Section: (p: SectionProps) => any 
 				</div>
 			</Section>
 
+			<MillenniumSection Section={Section} busy={!!busy} />
+
 			{available && !skipped && (
 				<section aria-labelledby="h-update" className="sp-card" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16, borderColor: 'var(--sp-accent)', boxShadow: 'var(--sp-glow)' }}>
 					<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -289,5 +309,49 @@ export function UpdateSections({ Section }: { Section: (p: SectionProps) => any 
 				</Section>
 			)}
 		</>
+	);
+}
+
+// ---------- Paramètres › Mises à jour › Millennium ----------
+
+function MillenniumSection({ Section, busy }: { Section: (p: SectionProps) => any; busy: boolean }) {
+	const m = useMillenniumState();
+	const [working, setWorking] = useState(false);
+	const [error, setError] = useState('');
+	useEffect(() => {
+		refreshMillenniumState();
+	}, []);
+	if (!m.running) return null;
+	const ok = matchesPinned(m.running.version);
+	const canInstall = !ok && !!installableAsset(PINNED, m.running.platform);
+	const sub = ok
+		? `Version testée avec Steam Upgraded. Ses mises à jour automatiques sont coupées : Millennium change de version avec Steam Upgraded, jamais seul.`
+		: m.running.platform === 'windows'
+			? `Steam Upgraded a été testé avec Millennium ${PINNED.version}. Installez cette version pour éviter les surprises ; Steam redémarre à la fin.`
+			: m.running.platform === 'macos'
+				? `Steam Upgraded a été testé avec Millennium ${PINNED.version}. Sur Mac, Millennium se met à jour avec l’app de Steam Upgraded, pas depuis Steam.`
+				: `Steam Upgraded a été testé avec Millennium ${PINNED.version}. Sous Linux, Millennium se met à jour avec le gestionnaire de paquets de votre distribution.`;
+	const go = async () => {
+		setWorking(true);
+		setError('');
+		try {
+			await installMillennium(PINNED);
+			restartSteam();
+		} catch (e: any) {
+			setError(e?.message || String(e));
+			setWorking(false);
+		}
+	};
+	return (
+		<Section id="h-millennium" title={`Millennium ${m.running.version || '?'}${ok ? '' : ` (version testée : ${PINNED.version})`}`} sub={sub}>
+			{canInstall && (
+				<div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+					<button type="button" className="sp-btn sp-btn--primary" disabled={working || busy} onClick={go}>
+						{working ? 'Téléchargement et vérification…' : `Installer Millennium ${PINNED.version}`}
+					</button>
+				</div>
+			)}
+			{error && <div role="alert" style={{ padding: '12px 14px', borderRadius: 14, background: 'var(--sp-surface2)', fontSize: 13 }}>{error}</div>}
+		</Section>
 	);
 }

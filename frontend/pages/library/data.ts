@@ -1,6 +1,7 @@
 // Données de la page Bibliothèque : instantané figé des objets MobX de Steam,
 // relu au montage, au retour sur la fenêtre et toutes les 30 s (sans re-rendu si rien n'a changé).
 import { useCallback, useEffect, useState } from 'react';
+import { installedHere } from '../../core/machines';
 import { artStamp, onArtChanged } from '../../core/art';
 import {
 	allApps,
@@ -84,7 +85,7 @@ function readLibrary(): Library {
 			mins2w: app.minutes_playtime_last_two_weeks || 0,
 			last: app.rt_last_time_played || 0,
 			purchased: app.rt_purchased_time || 0,
-			installed: !!app.installed,
+			installed: installedHere(app),
 			lender,
 			copies: Math.max(1, Number(app.number_of_copies) || 1),
 			art: artStamp(app),
@@ -163,7 +164,7 @@ export function useLibrary(): [Library, () => void] {
 		const tq = setInterval(() => {
 			const apps = allApps();
 			let k = apps.length * 10000;
-			for (const a of apps) if (a.installed) k++;
+			for (const a of apps) if (installedHere(a)) k++;
 			if (quick >= 0 && k !== quick) refresh();
 			quick = k;
 		}, 2000);

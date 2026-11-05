@@ -65,12 +65,54 @@ function menuDocument(menu: RootMenu): Document | undefined {
 	return popup?.window?.document;
 }
 
+// macOS : les menus de Steam sont dans la barre de menus du système, pas dans la page (pas de .RootMenuBar).
+// Repli : l'adresse steam:// que Steam déclare lui-même pour l'entrée dans la définition de ses menus.
+let menuUrls: Record<string, string> | null = null;
+function steamMenuUrls(): Record<string, string> {
+	if (menuUrls) return menuUrls;
+	const urls: Record<string, string> = {};
+	try {
+		let req: any;
+		w.webpackChunksteamui.push([[Symbol('steamupgraded-menus')], {}, (r: any) => (req = r)]);
+		for (const id of Object.keys(req?.m || {})) {
+			const src = String(req.m[id]);
+			if (!src.includes('#Menu_FriendsChat') || !src.includes('steamURL')) continue;
+			for (const m of src.matchAll(/\{name:"#(Menu_\w+)"[^{}]*?steamURL:"(steam:\/\/[^"]+)"/g)) urls[m[1]] ||= m[2];
+		}
+	} catch {}
+	// Si Steam change la forme de ses menus : au moins la liste de contacts (bouton de la barre du haut)
+	urls.Menu_FriendsChat ||= 'steam://open/friends';
+	urls.Menu_ViewFriendsList ||= urls.Menu_FriendsChat;
+	return (menuUrls = urls);
+}
+
+/** Adresse steam:// de l'entrée (notre libellé), si Steam en déclare une. */
+function menuItemUrl(item: string): string | undefined {
+	const urls = steamMenuUrls();
+	return [ITEMS[item] || []].flat().map((t) => urls[t]).find(Boolean);
+}
+
+/** Vrai si les menus de Steam sont dans la page (Windows, Linux) ; faux sur macOS. */
+export function hasNativeMenuBar(): boolean {
+	return !!mainWindow()?.document?.querySelector('.RootMenuBar');
+}
+
+/** Vrai si l'entrée peut être déclenchée ici (menu dans la page, ou adresse steam:// connue). */
+export function canRunNativeMenuItem(item: string): boolean {
+	return hasNativeMenuBar() || !!menuItemUrl(item);
+}
+
 /** Ouvre le menu racine en silence, clique l'entrée `item` (notre libellé), renvoie false si introuvable. */
 export async function runNativeMenuItem(menu: RootMenu, item: string): Promise<boolean> {
 	const doc = mainWindow()?.document;
 	const rootText = steamText(ROOTS[menu].token, menu);
 	const button = [...(doc?.querySelectorAll('.RootMenuBar .RootMenuButton') || [])].find((b) => clean((b as HTMLElement).innerText) === rootText || clean(b.textContent) === rootText);
-	if (!button) return false;
+	if (!button) {
+		const url = menuItemUrl(item);
+		if (!url) return false;
+		w.SteamClient?.URL?.ExecuteSteamURL?.(url);
+		return true;
+	}
 	const texts = [ITEMS[item] || []].flat().map((t) => steamText(t, item));
 	if (!texts.length) texts.push(item);
 	const before = menuDocument(menu);

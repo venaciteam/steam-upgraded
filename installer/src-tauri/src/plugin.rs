@@ -21,12 +21,20 @@ pub struct Marker {
     pub plugin_version: Option<String>,
     #[serde(default)]
     pub millennium_installed_by_installer: bool,
+    /// Windows : fichiers posés dans le dossier de Steam. macOS : dossiers du runtime, relatifs au dossier de Millennium.
     #[serde(default)]
     pub millennium_files: Vec<String>,
 }
 
+/// Dossier de Millennium : dans celui de Steam sous Windows, ~/Library/Application Support/Millennium sur macOS.
 pub fn millennium_dir(steam: &Path) -> PathBuf {
-    steam.join("millennium")
+    #[cfg(windows)]
+    return steam.join("millennium");
+    #[cfg(target_os = "macos")]
+    {
+        let _ = steam;
+        crate::env::mac_paths().millennium.clone()
+    }
 }
 
 /// Dossier des plugins : `plugins` (Millennium 3.6), ou `plugin` s'il est le seul présent.
@@ -39,7 +47,10 @@ pub fn plugins_dir(steam: &Path) -> PathBuf {
 }
 
 pub fn config_path(steam: &Path) -> PathBuf {
-    millennium_dir(steam).join("config").join("config.json")
+    #[cfg(windows)]
+    return millennium_dir(steam).join("config").join("config.json");
+    #[cfg(target_os = "macos")]
+    return millennium_dir(steam).join("config.json");
 }
 
 pub fn read_marker(steam: &Path) -> Marker {
@@ -98,9 +109,23 @@ pub fn detect(steam: &Path) -> Installed {
     Installed { installed, enabled, version: read_marker(steam).plugin_version.filter(|_| installed), has_sgdb_key }
 }
 
+/// Version gardée de côté par la dernière mise à jour faite depuis Steam (`backend/updates.lua`), à côté du dossier
+/// des plugins pour que Millennium ne la charge pas.
+const PREVIOUS: [&str; 2] = ["steam-upgraded-precedente.star", "steam-upgraded-precedente.json"];
+
+/// Retire la version gardée de côté : après un passage de l'installeur, elle ne correspond plus à « la version
+/// d'avant » et Paramètres › Mises à jour proposerait d'y revenir.
+fn remove_previous(steam: &Path, backup: &mut Backup) -> Result<(), String> {
+    for name in PREVIOUS {
+        backup.remove(&millennium_dir(steam).join(name))?;
+    }
+    Ok(())
+}
+
 /// Copie le fichier du plugin dans le dossier des plugins de Millennium.
 pub fn copy(steam: &Path, backup: &mut Backup) -> Result<(), String> {
-    backup.write(&plugins_dir(steam).join(STAR_NAME), STAR)
+    backup.write(&plugins_dir(steam).join(STAR_NAME), STAR)?;
+    remove_previous(steam, backup)
 }
 
 /// Active le plugin et enregistre la clé SteamGridDB si elle est donnée (les autres réglages sont gardés).
@@ -110,6 +135,18 @@ pub fn enable(steam: &Path, sgdb_key: Option<&str>, skip_millennium_welcome: boo
     let mut cfg = read_config(steam)?;
     if !cfg.is_object() {
         cfg = json!({});
+    }
+    // Millennium figé : ses mises à jour automatiques sont coupées (par défaut il installe seul ses nouvelles versions
+    // au démarrage de Steam). Il change de version avec Steam Upgraded (installeur ou Paramètres › Mises à jour).
+    {
+        let root = cfg.as_object_mut().unwrap();
+        let general = root.entry("general").or_insert_with(|| json!({}));
+        if !general.is_object() {
+            *general = json!({});
+        }
+        let g = general.as_object_mut().unwrap();
+        g.insert("checkForMillenniumUpdates".into(), json!(false));
+        g.insert("onMillenniumUpdate".into(), json!(0));
     }
     if skip_millennium_welcome {
         let root = cfg.as_object_mut().unwrap();
@@ -147,6 +184,7 @@ pub fn enable(steam: &Path, sgdb_key: Option<&str>, skip_millennium_welcome: boo
 /// Retire le plugin, son activation et ses réglages.
 pub fn uninstall(steam: &Path, backup: &mut Backup) -> Result<(), String> {
     backup.remove(&plugins_dir(steam).join(STAR_NAME))?;
+    remove_previous(steam, backup)?;
     if !config_path(steam).is_file() {
         return Ok(());
     }

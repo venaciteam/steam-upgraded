@@ -1,6 +1,6 @@
 // Petits composants de la page Bibliothèque : icônes, avatar, bouton Jouer.
 import { useState } from 'react';
-import { playOrInstall } from '../../core/steam';
+import { PlayControl } from '../game/PlayControl';
 import type { Game, Person } from './data';
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -79,22 +79,7 @@ export function Dot({ color, size = 8 }: { color: string; size?: number }) {
 	return <span aria-hidden="true" style={{ width: size, height: size, borderRadius: '50%', background: color, flex: 'none', display: 'inline-block' }} />;
 }
 
-/** Bouton Jouer / Installer selon l'état d'installation. */
+/** Bouton Jouer / Installer / Streamer (core/machines.ts), avec la flèche des autres machines s'il y en a. */
 export function PlayButton({ g, compact, style }: { g: Game; compact?: boolean; style?: any }) {
-	const label = g.installed ? 'Jouer' : 'Installer';
-	return (
-		<button
-			type="button"
-			className={g.installed ? 'sp-btn sp-btn--primary' : 'sp-btn'}
-			onClick={(e) => {
-				e.stopPropagation();
-				playOrInstall(g.app);
-			}}
-			aria-label={`${label} : ${g.name}`}
-			style={{ flex: 'none', height: compact ? 36 : 40, padding: compact ? '0 14px' : '0 18px', ...style }}
-		>
-			{g.installed ? <IconPlay size={14} /> : <IconDownload size={15} />}
-			{label}
-		</button>
-	);
+	return <PlayControl app={g.app} name={g.name} compact={compact} style={style} />;
 }

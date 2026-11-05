@@ -10,16 +10,20 @@ Steam Upgraded est un plugin pour Millennium qui remplace l'interface de Steam p
 
 ![Bibliothèque](media/bureau-bibliotheque.jpg)
 
-<!-- Liens permanents vers la dernière version : chaque publication doit joindre ces deux fichiers, avec ces noms exacts. -->
+<!-- Liens permanents vers la dernière version : chaque publication doit joindre ces fichiers, avec ces noms exacts (Steam-Upgraded-Setup.exe, Steam-Upgraded-macOS.zip, com.venacity.steamupgraded.star, millennium-<étiquette>-macos-arm64.tar.gz). -->
 
 ## Télécharger
 
 **Windows 10 et 11**, avec Steam installé :
 
-- **[Télécharger l'installeur](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-Setup.exe)** : il s'occupe de tout, Millennium compris. En cas de doute, c'est celui-ci.
+- **[Télécharger l'installeur pour Windows](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-Setup.exe)** : il s'occupe de tout, Millennium compris. En cas de doute, c'est celui-ci.
 - **[Télécharger le plugin seul](https://github.com/venaciteam/steam-upgraded/releases/latest/download/com.venacity.steamupgraded.star)** : si Millennium est déjà installé (voir [Installation manuelle](#installation)).
 
-Le message de Windows au premier lancement et les étapes : voir [Installation](#installation). Toutes les versions : [publications](../../releases).
+**Mac avec puce Apple** (M1 et plus récent, macOS 11 ou plus récent), avec Steam installé et ouvert une fois :
+
+- **[Télécharger l'installeur pour Mac](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-macOS.zip)** : il installe Millennium, le plugin et l'app « Steam Upgraded », par laquelle vous ouvrez désormais Steam.
+
+Le message du système au premier lancement et les étapes : voir [Installation](#installation). Toutes les versions : [publications](../../releases).
 
 | Fiche d'un jeu | Magasin | Paramètres › Apparence |
 | --- | --- | --- |
@@ -43,7 +47,7 @@ Le message de Windows au premier lancement et les étapes : voir [Installation](
 - **Magasin** : les promotions qui vous concernent, à commencer par celles de votre liste de souhaits, aux prix de votre pays ; toute votre liste de souhaits (filtres, tris, ajout au panier) et votre panier Steam (le paiement se fait sur la page de Steam).
 - **Paramètres réunis** : ceux de Steam Upgraded et ceux de Steam dans une seule page.
 - **Pages et fenêtres de Steam habillées** : téléchargements, menus, dialogues, propriétés, notifications, contacts et discussions, captures, bandes-son et lecteur de musique.
-- **Transitions entre les pages** et ouverture animée, courtes, qui respectent le réglage « Animations réduites » de Windows.
+- **Transitions entre les pages** et ouverture animée, courtes, qui respectent le réglage « Animations réduites » du système.
 
 **En Big Picture**
 
@@ -66,15 +70,26 @@ Le message de Windows au premier lancement et les étapes : voir [Installation](
 
 ## Installation
 
-Il faut Windows et Steam. L'installeur s'occupe du reste, Millennium compris.
+Il faut Steam, sur Windows 10 ou 11, ou sur un Mac avec puce Apple. L'installeur s'occupe du reste, Millennium compris.
+
+### Windows
 
 1. Téléchargez **[`Steam-Upgraded-Setup.exe`](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-Setup.exe)** (dernière version).
 2. Lancez-le. L'installeur n'est pas signé : Windows SmartScreen peut afficher « Windows a protégé votre ordinateur ». Cliquez alors sur « Informations complémentaires », puis « Exécuter quand même ».
-3. Suivez les écrans. L'installeur vérifie Steam et Millennium, installe ou met à jour Millennium si besoin (version 3.6 ou plus récente, téléchargée depuis ses publications officielles et vérifiée), installe le plugin, puis relance Steam. Steam doit être fermé pendant l'installation : l'installeur vous le demande s'il est ouvert.
+3. Suivez les écrans. L'installeur vérifie Steam et Millennium, installe Millennium si besoin dans la version testée avec Steam Upgraded (indiquée dans `millennium.lock.json`, téléchargée depuis ses publications officielles et vérifiée), installe le plugin, puis relance Steam. Steam doit être fermé pendant l'installation : l'installeur vous le demande s'il est ouvert.
 
 En cas d'échec, tout ce qui a été modifié est remis en place.
 
-**Installation manuelle** (si Millennium est déjà installé) : copiez [`com.venacity.steamupgraded.star`](https://github.com/venaciteam/steam-upgraded/releases/latest/download/com.venacity.steamupgraded.star) (fourni dans chaque publication) dans le dossier `millennium\plugins` de Steam, puis activez « Steam Upgraded » dans les réglages de Millennium.
+### Mac
+
+1. Téléchargez **[`Steam-Upgraded-macOS.zip`](https://github.com/venaciteam/steam-upgraded/releases/latest/download/Steam-Upgraded-macOS.zip)** (dernière version) et ouvrez-le : il contient « Installer Steam Upgraded ».
+2. Ouvrez « Installer Steam Upgraded ». Il n'est pas signé par Apple : au premier lancement, macOS refuse de l'ouvrir. Allez alors dans **Réglages Système › Confidentialité et sécurité**, tout en bas, cliquez sur « Ouvrir quand même », puis confirmez. Il suffit de le faire une fois.
+3. Suivez les écrans. L'installeur installe Millennium (la version testée avec Steam Upgraded, compilée pour Mac à partir de ses sources officielles et vérifiée), le plugin, et l'app **« Steam Upgraded »** dans le dossier Applications.
+4. **Ouvrez désormais Steam avec l'app « Steam Upgraded »** : c'est elle qui charge Steam Upgraded (l'app Steam d'origine ouvre Steam sans). Mettez-la dans le Dock à la place de Steam. Elle ne modifie aucun fichier de Steam : les mises à jour de Steam n'y changent rien.
+
+En cas d'échec, tout ce qui a été modifié est remis en place.
+
+**Installation manuelle** (si Millennium est déjà installé) : copiez [`com.venacity.steamupgraded.star`](https://github.com/venaciteam/steam-upgraded/releases/latest/download/com.venacity.steamupgraded.star) (fourni dans chaque publication) dans le dossier des plugins de Millennium (`millennium\plugins` dans le dossier de Steam sous Windows), puis activez « Steam Upgraded » dans les réglages de Millennium.
 
 ## SteamGridDB (facultatif)
 
@@ -84,18 +99,20 @@ Pour choisir d'autres visuels pour vos jeux, il faut une clé API SteamGridDB, p
 2. Dans votre profil, ouvrez **Préférences › API** et générez une clé.
 3. Collez-la dans l'installeur, ou plus tard dans **Paramètres › SteamGridDB** de Steam Upgraded.
 
-La clé reste sur votre PC, dans la configuration de Millennium. Chaque personne utilise la sienne : le plugin n'en contient aucune.
+La clé reste sur votre ordinateur, dans la configuration de Millennium. Chaque personne utilise la sienne : le plugin n'en contient aucune.
 
 ## Mises à jour
 
 Depuis la version 0.1.1, Steam Upgraded vérifie lui-même s'il existe une nouvelle version (au démarrage de Steam, puis régulièrement). Quand c'est le cas, une pastille apparaît sur l'onglet **Paramètres** : dans **Paramètres › Mises à jour**, lisez les nouveautés puis cliquez sur « Installer la mise à jour ». Le fichier est vérifié avant d'être installé, l'interface de Steam se recharge en quelques secondes, et vos réglages, votre clé SteamGridDB et vos visuels personnalisés sont conservés. Vous pouvez aussi ignorer une version, ou revenir à la précédente si une mise à jour pose problème.
+
+**Millennium suit Steam Upgraded.** Chaque version de Steam Upgraded est testée avec une version précise de Millennium (`millennium.lock.json`), et les mises à jour automatiques de Millennium sont coupées : il ne change de version qu'avec Steam Upgraded. Quand une mise à jour demande une autre version de Millennium, elle l'installe en même temps (empreinte vérifiée), puis Steam redémarre.
 
 Avec la version 0.1.0, ou pour réparer une installation : téléchargez le nouvel installeur et lancez-le, il propose « Mettre à jour vers » la nouvelle version.
 
 ## Désinstallation
 
 - Depuis Steam : **Paramètres › Mises à jour › Désinstaller…** (vous pouvez garder vos réglages pour une réinstallation). Millennium reste installé.
-- Ou depuis l'installeur : il propose « Désinstaller », avec l'option de retirer aussi Millennium s'il l'avait installé lui-même.
+- Ou depuis l'installeur : il propose « Désinstaller », avec l'option de retirer aussi Millennium s'il l'avait installé lui-même (sur Mac, l'app « Steam Upgraded » part avec lui).
 
 Dans les deux cas, Steam retrouve son interface d'origine.
 
@@ -108,11 +125,11 @@ Steam Upgraded ne collecte rien et n'envoie rien à son auteur. Il n'a pas de se
 - **Google Fonts**, pour charger la police Manrope de l'interface ;
 - **GitHub**, depuis l'installeur uniquement, pour télécharger Millennium.
 
-Vos réglages et les relevés de temps de jeu (qui servent au graphique de la fiche d'un jeu) restent sur votre PC.
+Vos réglages et les relevés de temps de jeu (qui servent au graphique de la fiche d'un jeu) restent sur votre ordinateur.
 
 ## Pour développer
 
-Prérequis : [Millennium](https://github.com/SteamClientHomebrew/Millennium) 3.6 ou plus récent, [Bun](https://bun.sh/) ou Node.js, et Rust pour l'installeur.
+Prérequis : [Millennium](https://github.com/SteamClientHomebrew/Millennium) dans la version de `millennium.lock.json` (3.6.2), [Bun](https://bun.sh/) ou Node.js, et Rust pour l'installeur.
 
 ```bash
 bun install        # dépendances (et types de Millennium)
@@ -121,7 +138,7 @@ bun run build      # compile le plugin et l'installe dans le Steam local
 
 Lancez Steam avec `-dev` pour avoir les outils de développement de l'interface sur `http://127.0.0.1:8080`. Rechargez l'interface après une compilation.
 
-L'installeur Windows (Tauri 2) se compile avec `bash installer/build.sh` et sort dans `installer/dist/`. Le mode `--simulation [vierge|ancien|installe|sans-steam|erreur-reseau|steam-bloque]` travaille dans un faux dossier Steam, sans toucher au vrai.
+L'installeur (Tauri 2) se compile avec `bash installer/build.sh` et sort dans `installer/dist/` : `.exe` sous Windows, `Steam-Upgraded-macOS.zip` sur Mac. Millennium pour Mac se compile avec `bash millennium/build-macos.sh` (voir [`millennium/`](millennium/)). Le mode `--simulation [vierge|ancien|installe|sans-steam|erreur-reseau|steam-bloque]` travaille dans un faux dossier Steam, sans toucher au vrai.
 
 Organisation du code :
 
@@ -133,8 +150,11 @@ Organisation du code :
 | `frontend/bigpicture/` | écrans et habillage de Big Picture |
 | `frontend/features/` | SteamGridDB, paramètres de Steam intégrés, musique, désinstallation… |
 | `backend/` | backend Lua (magasin, SteamGridDB, visuels, désinstallation) |
-| `installer/` | installeur Windows (Rust + HTML) |
+| `installer/` | installeur Windows et Mac (Rust + HTML) |
+| `millennium/` | Millennium pour Mac : correctifs et compilation |
 
 ## Licence
 
 [MIT](LICENSE) © 2026 Venacity
+
+Steam Upgraded s'appuie sur [Millennium](https://github.com/SteamClientHomebrew/Millennium), Copyright (c) 2026 Project Millennium, licence MIT. Le dossier [`millennium/`](millennium/) contient les correctifs macOS de Millennium (issus de la [PR #841](https://github.com/SteamClientHomebrew/Millennium/pull/841) par iFleey), sous la même licence ([texte](millennium/LICENSE-Millennium.md)).

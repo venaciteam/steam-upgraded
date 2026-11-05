@@ -22,14 +22,16 @@ function sample(x, y) {
   const d = Math.min(segDist(x, y, 7, 14, 12, 9), segDist(x, y, 12, 9, 17, 14));
   return d <= 1.2 ? INK : ACCENT;
 }
-function png(size) {
+// mac : marge du gabarit d'Apple (dessin de 824 px dans 1024), sinon l'icône paraît trop grosse dans le Dock.
+function png(size, mac = false) {
+  const k = mac ? 824 / 1024 : 1, pad = (1 - k) / 2;
   const ss = 4, rows = [];
   for (let y = 0; y < size; y++) {
     const row = [0];
     for (let x = 0; x < size; x++) {
       let r = 0, g = 0, b = 0, a = 0;
       for (let sy = 0; sy < ss; sy++) for (let sx = 0; sx < ss; sx++) {
-        const c = sample(((x + (sx + 0.5) / ss) / size) * 24, ((y + (sy + 0.5) / ss) / size) * 24);
+        const c = sample((((x + (sx + 0.5) / ss) / size - pad) / k) * 24, (((y + (sy + 0.5) / ss) / size - pad) / k) * 24);
         if (c) { r += c[0]; g += c[1]; b += c[2]; a++; }
       }
       const n = ss * ss;
@@ -51,3 +53,18 @@ const dir = sizes.map((s, i) => { const e = Buffer.alloc(16); e[0] = s === 256 ?
 writeFileSync(join(out, 'icon.ico'), Buffer.concat([header, ...dir, ...images]));
 writeFileSync(join(out, 'icon.png'), images[sizes.indexOf(256)]);
 console.log('icônes écrites dans', out);
+
+// macOS : icon.icns de l'app lanceur « Steam Upgraded » (iconutil, présent sur tout Mac)
+if (process.platform === 'darwin') {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const set = join(mkdtempSync(join(tmpdir(), 'icone-')), 'icon.iconset');
+  mkdirSync(set);
+  for (const z of [16, 32, 128, 256, 512]) {
+    writeFileSync(join(set, `icon_${z}x${z}.png`), png(z, true));
+    writeFileSync(join(set, `icon_${z}x${z}@2x.png`), png(z * 2, true));
+  }
+  execFileSync('iconutil', ['-c', 'icns', set, '-o', join(out, 'icon.icns')]);
+  rmSync(dirname(set), { recursive: true, force: true });
+}
