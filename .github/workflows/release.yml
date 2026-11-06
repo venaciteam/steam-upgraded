@@ -1,0 +1,97 @@
+# Publication d'une version : compile l'installeur Windows et le plugin (.star) sur Windows, l'installeur Mac sur Mac,
+# puis joint les fichiers à la publication de l'étiquette, aux noms fixes attendus par les liens « dernière version ».
+# Déclenché par l'envoi d'une étiquette vX.Y.Z (la version de millennium.toml doit lui correspondre).
+# Si une publication en brouillon existe déjà pour l'étiquette (avec ses notes), elle est complétée puis publiée.
+name: Publication
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Étiquette à publier (ex. v0.2.1)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Compilation (${{ matrix.os }})
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: installer/src-tauri
+      - name: Version de l'étiquette
+        run: |
+          V=$(grep -m1 '^version' millennium.toml | cut -d'"' -f2)
+          [ "v$V" = "$TAG" ] || { echo "millennium.toml indique $V, l'étiquette est $TAG"; exit 1; }
+      - run: bun install --frozen-lockfile
+      - run: bash installer/build.sh
+      - name: Fichiers à publier
+        run: |
+          mkdir -p out
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            cp installer/dist/Steam-Upgraded-macOS.zip out/
+          else
+            cp "installer/dist/Installer Steam Upgraded ${TAG#v}.exe" out/Steam-Upgraded-Setup.exe
+            cp installer/payload/com.venacity.steamupgraded.star out/
+          fi
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ runner.os }}
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    name: Publication
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Millennium pour Mac (archive de millennium.lock.json, empreinte vérifiée)
+        run: |
+          URL=$(jq -r .macos.url millennium.lock.json)
+          SHA=$(jq -r .macos.sha256 millennium.lock.json)
+          F="out/$(basename "$URL")"
+          curl -fsSL "$URL" -o "$F"
+          echo "$SHA  $F" | sha256sum -c -
+      - name: Publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l out
+          sha256sum out/*
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber
+            gh release edit "$TAG" --draft=false --latest
+          else
+            gh release create "$TAG" out/* --title "Steam Upgraded ${TAG#v}" --generate-notes --latest
+          fi

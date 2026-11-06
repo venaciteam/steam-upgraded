@@ -6,8 +6,7 @@ import { usePath, currentPath } from '../core/history';
 import { albumCovers, isAlbumInstalled, playAlbum, music, Status, totalLabel, clock, Track, useAlbum, usePlayback } from '../features/music';
 import { Item, uninstall } from './library/menu';
 import { usePageTransition } from '../core/transitions';
-
-const w = window as any;
+import { openInstallWizard } from '../core/machines';
 
 function useRouteAlbumId(props: any): number {
 	const path = usePath();
@@ -192,7 +191,7 @@ export function AlbumPage(props: any) {
 								{here ? (pb?.status === Status.Playing ? 'Pause' : 'Reprendre') : 'Écouter l’album'}
 							</button>
 						) : (
-							<button type="button" className="sp-btn sp-btn--primary" style={{ height: 46, padding: '0 22px', alignItems: 'center' }} onClick={() => w.SteamClient.Installs.OpenInstallWizard([appid])}>
+							<button type="button" className="sp-btn sp-btn--primary" style={{ height: 46, padding: '0 22px', alignItems: 'center' }} onClick={() => openInstallWizard([appid])}>
 								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
 									<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />
 								</svg>

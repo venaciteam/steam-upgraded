@@ -85,9 +85,17 @@ function runHere(app: any) {
 	w.SteamClient.Apps.RunGame(String(app.gameid || app.appid), '', -1, 100);
 }
 
+/**
+ * Assistant d'installation de Steam pour une machine du compte (LOCAL_ID : l'ordinateur devant soi).
+ * Steam exige désormais la machine (2e argument) : sans elle, l'appel échoue sans rien afficher (« requires 2 arguments »).
+ */
+export function openInstallWizard(appids: number[], clientid: string = LOCAL_ID) {
+	w.SteamClient.Installs.OpenInstallWizard(appids.map(Number), clientid);
+}
+
 function installHere(app: any) {
 	if (String(app?.selected_clientid ?? LOCAL_ID) !== LOCAL_ID) selectMachine(app.appid, LOCAL_ID);
-	w.SteamClient.Installs.OpenInstallWizard([app.appid]);
+	openInstallWizard([app.appid]);
 }
 
 /**
@@ -104,7 +112,7 @@ export function gameActions(app: any): { primary: GameAction; choices: GameActio
 		// Pas de données par machine (raccourci non Steam, ancienne version de Steam) : comportement d'origine
 		const a: GameAction = app?.installed
 			? { kind: 'play', label: 'Jouer', run: () => w.SteamClient.Apps.RunGame(String(app.gameid || app.appid), '', -1, 100) }
-			: { kind: 'install', label: 'Installer', run: () => w.SteamClient.Installs.OpenInstallWizard([app.appid]) };
+			: { kind: 'install', label: 'Installer', run: () => openInstallWizard([app.appid]) };
 		return { primary: a, choices: [a] };
 	}
 	const here = hereLabel();
@@ -119,7 +127,7 @@ export function gameActions(app: any): { primary: GameAction; choices: GameActio
 	// Installation sur une autre machine du compte (Steam l'y lance à distance), pour la streamer ensuite
 	const remoteInstalls: GameAction[] = m.others
 		.filter((o) => !o.installed && o.available)
-		.map((o) => ({ kind: 'remote-install' as const, label: `Installer sur ${o.name}`, machine: o, run: () => w.SteamClient.Installs.OpenInstallWizard([app.appid], o.id) }));
+		.map((o) => ({ kind: 'remote-install' as const, label: `Installer sur ${o.name}`, machine: o, run: () => openInstallWizard([app.appid], o.id) }));
 	const choices = [hereAction, ...streams, ...remoteInstalls];
 	let primary: GameAction;
 	if (hereAction.kind !== 'unavailable') primary = { ...hereAction, label: hereAction.kind === 'play' ? 'Jouer' : 'Installer' };

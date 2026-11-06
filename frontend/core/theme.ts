@@ -65,7 +65,7 @@ export function buildCss(s: Settings): string {
 	const p3 = s.hdrWide
 		? `@media (color-gamut: p3){:root{--sp-accent:color(display-p3 ${(r / 255).toFixed(3)} ${(g / 255).toFixed(3)} ${(b / 255).toFixed(3)});}}`
 		: '';
-	const squircle = s.forme === 'squircle' ? `.sp-root,.sp-root *,.sp-topnav,.sp-topnav *,.sp-pop,.sp-pop *,.contextMenu,.contextMenuItem,.DownloadsPage .Section,.DownloadsPage .SectionItem,.DownloadsPage .DialogButton,.sp-steamset *,.DesktopUI .AppProperties *,.DesktopUI .GenericDialogBase,.DesktopUI .GenericDialogBase *,.DesktopToastContainer .Middle,.DesktopToastContainer .AppLogo *{corner-shape:squircle;}` : '';
+	const squircle = s.forme === 'squircle' ? `.sp-root,.sp-root *,.sp-topnav,.sp-topnav *,.sp-pop,.sp-pop *,.contextMenu,.contextMenuItem,.DownloadsPage .Section,.DownloadsPage .SectionItem,.DownloadsPage .DialogButton,.sp-steamset *,.DesktopUI .AppProperties *,.DesktopUI .GenericDialogBase,.DesktopUI .GenericDialogBase *,.DesktopUI .InstallRequestModal,.DesktopUI .InstallRequestModal *,.DesktopToastContainer .Middle,.DesktopToastContainer .AppLogo *{corner-shape:squircle;}` : '';
 	const hdrImages = s.hdrWide ? `.sp-root img{dynamic-range-limit:${s.hdrHalo ? 'no-limit' : 'constrained'};}` : '';
 	return `
 :root{${vars}}
@@ -399,7 +399,7 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI :is(.sp-steamset,.AppProperties) :is(:not(.Field) + .Field,.Field:first-child){border-top-width:1px !important;border-top-left-radius:var(--sp-r-lg) !important;border-top-right-radius:var(--sp-r-lg) !important;margin-top:12px !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .Field:not(:has(+ .Field)){border-bottom-left-radius:var(--sp-r-lg) !important;border-bottom-right-radius:var(--sp-r-lg) !important;margin-bottom:12px !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .Field::before,.DesktopUI :is(.sp-steamset,.AppProperties) .Field::after{display:none !important;}
-.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase),.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase) *:not(svg *){font-family:var(--sp-font) !important;}
+.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase,.InstallRequestModal),.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase,.InstallRequestModal) *:not(svg *){font-family:var(--sp-font) !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .FieldLabel,.DesktopUI :is(.sp-steamset,.AppProperties) .EntryLabel{color:var(--sp-text) !important;font-weight:700 !important;font-size:14px !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) :is(.FieldDescription,.EntryValue,.SettingsDialogBodyText,.SettingsDialogDescriptionText,.DialogBodyText,.SecondaryText,.Detail){color:var(--sp-muted) !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .FieldDescription{font-size:12px !important;line-height:1.45 !important;}
@@ -462,21 +462,61 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 
 /* Dialogues natifs (activer un produit, désinstaller, confirmations…) */
 .DesktopUI .FullModalOverlay{background:rgba(0,0,0,.66) !important;}
-.DesktopUI .ModalPosition:has(.GenericDialogBase) .ModalPosition_TopBar{display:none !important;}
-.DesktopUI .GenericDialogBase .DialogContent_InnerWidth{overflow-x:hidden !important;}
-.DesktopUI .GenericDialogBase{background:var(--sp-surface) !important;background-image:none !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-lg) !important;padding:28px !important;box-shadow:0 30px 80px rgba(0,0,0,.6) !important;color:var(--sp-text) !important;}
-.DesktopUI .GenericDialogBase::before,.DesktopUI .GenericDialogBase::after{display:none !important;}
-.DesktopUI .GenericDialogBase .DialogHeader{color:var(--sp-text) !important;font-size:21px !important;font-weight:800 !important;text-transform:none !important;letter-spacing:0 !important;padding:0 40px 0 0 !important;margin:0 0 12px !important;}
-.DesktopUI .GenericDialogBase :is(.DialogBodyText,.InfoBody){color:var(--sp-muted) !important;line-height:1.5 !important;}
-.DesktopUI .GenericDialogBase .InfoExampleHeader{color:var(--sp-muted) !important;font-size:11px !important;font-weight:700 !important;letter-spacing:.08em !important;}
-.DesktopUI .GenericDialogBase .DialogFooter{display:flex !important;justify-content:flex-end;gap:10px;margin-top:20px !important;}
-.DesktopUI .GenericDialogBase .DialogFooter > *{display:flex !important;gap:10px;flex:none !important;width:auto !important;}
-.DesktopUI .GenericDialogBase .DialogFooter .DialogButton{width:auto !important;min-width:0 !important;flex:none !important;margin:0 !important;}
-.DesktopUI .GenericDialogBase .DialogFooter .DialogButton.Secondary{order:-1;}
-.DesktopUI .ModalPosition:has(.GenericDialogBase) .ModalPosition_Dismiss{top:16px !important;right:16px !important;width:32px !important;height:32px !important;z-index:2;}
-.DesktopUI .ModalPosition:has(.GenericDialogBase) .closeButton{width:32px !important;height:32px !important;border-radius:50% !important;background:var(--sp-surface2) !important;display:flex !important;align-items:center;justify-content:center;corner-shape:round !important;}
-.DesktopUI .ModalPosition:has(.GenericDialogBase) .closeButton svg{width:12px !important;height:12px !important;}
-.DesktopUI .ModalPosition:has(.GenericDialogBase) .closeButton svg *{stroke:var(--sp-muted) !important;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .ModalPosition_TopBar{display:none !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogContent_InnerWidth{overflow-x:hidden !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal){background:var(--sp-surface) !important;background-image:none !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-lg) !important;padding:28px !important;box-shadow:0 30px 80px rgba(0,0,0,.6) !important;color:var(--sp-text) !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal)::before,.DesktopUI :is(.GenericDialogBase,.InstallRequestModal)::after{display:none !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogHeader{color:var(--sp-text) !important;font-size:21px !important;font-weight:800 !important;text-transform:none !important;letter-spacing:0 !important;padding:0 40px 0 0 !important;margin:0 0 12px !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) :is(.DialogBodyText,.InfoBody){color:var(--sp-muted) !important;line-height:1.5 !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .InfoExampleHeader{color:var(--sp-muted) !important;font-size:11px !important;font-weight:700 !important;letter-spacing:.08em !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter{display:flex !important;justify-content:flex-end;gap:10px;margin-top:20px !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter > *{display:flex !important;gap:10px;flex:none !important;width:auto !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter .DialogButton{width:auto !important;min-width:0 !important;flex:none !important;margin:0 !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter .DialogButton.Secondary{order:-1;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .ModalPosition_Dismiss{top:16px !important;right:16px !important;width:32px !important;height:32px !important;z-index:2;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .closeButton{width:32px !important;height:32px !important;border-radius:50% !important;background:var(--sp-surface2) !important;display:flex !important;align-items:center;justify-content:center;corner-shape:round !important;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .closeButton svg{width:12px !important;height:12px !important;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .closeButton svg *{stroke:var(--sp-muted) !important;}
+/* Installation d'un jeu (InstallRequestModal) : jeux à installer, raccourcis, choix du disque */
+.DesktopUI .InstallRequestModal{width:min(560px,calc(100vw - 48px)) !important;max-width:none !important;}
+.DesktopUI .InstallRequestModal :is(.DialogHeader,.DialogBody,.DialogBodyText,.AppsToInstall){border:0 !important;box-shadow:none !important;}
+.DesktopUI .InstallRequestModal .DialogBodyText{display:flex !important;flex-direction:column;gap:18px;margin:0 !important;}
+.DesktopUI .InstallRequestModal .DialogFooter{padding-top:0 !important;margin-top:24px !important;}
+.DesktopUI .InstallRequestModal .FolderSelector{padding:0 !important;}
+.DesktopUI .InstallRequestModal .AppsToInstall{display:flex !important;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;margin:0 !important;}
+.DesktopUI .InstallRequestModal .AppToInstall{display:flex !important;align-items:center;gap:14px;padding:10px 14px 10px 10px !important;margin:0 !important;background:var(--sp-surface2) !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-md) !important;}
+.DesktopUI .InstallRequestModal .AppLogo{width:120px !important;height:45px !important;flex:none;border-radius:var(--sp-r-sm) !important;overflow:hidden;background:var(--sp-bg) !important;}
+.DesktopUI .InstallRequestModal .AppLogo img{width:100% !important;height:100% !important;object-fit:cover;}
+.DesktopUI .InstallRequestModal .AppName{flex:1 1 auto;min-width:0;color:var(--sp-text) !important;font-size:15px !important;font-weight:700 !important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.DesktopUI .InstallRequestModal .DiskSpace{color:var(--sp-muted) !important;font-size:13px !important;font-weight:600 !important;text-transform:none !important;letter-spacing:0 !important;font-variant-numeric:tabular-nums;}
+.DesktopUI .InstallRequestModal .AppSizeRequired{flex:none;}
+.DesktopUI .InstallRequestModal .CreateShortcuts{display:flex !important;flex-wrap:wrap;gap:10px 24px;margin:0 !important;}
+.DesktopUI .InstallRequestModal .DialogCheckbox_Container{display:flex !important;align-items:center;gap:10px;padding:0 !important;margin:0 !important;color:var(--sp-text) !important;cursor:pointer;}
+.DesktopUI .InstallRequestModal .DialogToggle_Label{color:var(--sp-text) !important;font-size:14px !important;}
+.DesktopUI .InstallRequestModal .DialogCheckbox{width:20px !important;height:20px !important;min-width:20px !important;margin:0 !important;border-radius:6px !important;border:1.5px solid var(--sp-muted) !important;background:transparent !important;box-shadow:none !important;}
+.DesktopUI .InstallRequestModal .DialogCheckbox svg{opacity:0;}
+.DesktopUI .InstallRequestModal .DialogCheckbox.Active{background:var(--sp-accent) !important;border-color:var(--sp-accent) !important;}
+.DesktopUI .InstallRequestModal .DialogCheckbox.Active svg{opacity:1;}
+.DesktopUI .InstallRequestModal .DialogCheckbox.Active svg *{fill:var(--sp-accent-ink) !important;stroke:var(--sp-accent-ink) !important;filter:none !important;}
+.DesktopUI .InstallRequestModal .FolderSelector{display:flex !important;flex-direction:column;gap:10px;margin:0 !important;}
+.DesktopUI .InstallRequestModal .FolderSelector > .Header{display:flex !important;align-items:center;justify-content:space-between;margin:0 !important;color:var(--sp-muted) !important;font-size:11px !important;font-weight:700 !important;letter-spacing:.08em !important;text-transform:uppercase;}
+.DesktopUI .InstallRequestModal .FolderSettings{width:34px !important;height:34px !important;min-width:0 !important;min-height:0 !important;padding:0 !important;display:flex !important;align-items:center;justify-content:center;border-radius:50% !important;corner-shape:round !important;}
+.DesktopUI .InstallRequestModal .FolderSettings svg{width:16px !important;height:16px !important;}
+.DesktopUI .InstallRequestModal .FolderSettings svg *{fill:var(--sp-muted) !important;}
+.DesktopUI .InstallRequestModal .FolderSettings:hover svg *{fill:var(--sp-text) !important;}
+.DesktopUI .InstallRequestModal .FolderSelector > div:not(.Header){display:flex !important;flex-direction:column;gap:8px;}
+.DesktopUI .InstallRequestModal .FolderOption{display:flex !important;align-items:center;gap:12px;min-height:52px;padding:0 16px !important;margin:0 !important;background:var(--sp-surface2) !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-md) !important;color:var(--sp-text) !important;box-shadow:none !important;cursor:pointer;transition:border-color .15s,background .15s;}
+.DesktopUI .InstallRequestModal .FolderOption:hover{border-color:color-mix(in srgb,var(--sp-accent) 55%,var(--sp-line)) !important;}
+.DesktopUI .InstallRequestModal .FolderOption.Active{background:color-mix(in srgb,var(--sp-accent) 14%,var(--sp-surface2)) !important;border-color:var(--sp-accent) !important;}
+.DesktopUI .InstallRequestModal .FolderOption :is(.FolderFlag,.FolderFlagStar){display:flex;align-items:center;flex:none;}
+.DesktopUI .InstallRequestModal .FolderOption :is(.FolderFlag,.FolderFlagStar) svg{width:18px !important;height:18px !important;}
+.DesktopUI .InstallRequestModal .FolderOption .FolderFlag svg *{fill:var(--sp-muted) !important;}
+.DesktopUI .InstallRequestModal .FolderOption.Active .FolderFlag svg *{fill:var(--sp-accent) !important;}
+.DesktopUI .InstallRequestModal .FolderOption .FolderFlagStar svg *{fill:var(--sp-accent) !important;}
+.DesktopUI .InstallRequestModal .FolderName{flex:1 1 auto;min-width:0;color:var(--sp-text) !important;font-size:15px !important;font-weight:700 !important;}
+.DesktopUI .InstallRequestModal .FolderOption .FreeSpace{flex:none;}
+.DesktopUI .InstallRequestModal .NoticeInstallFolder{color:var(--sp-muted) !important;font-size:13px !important;margin:0 !important;}
+.DesktopUI .InstallRequestModal .NoticeInstallFolder:not(:has(:not(:empty))){display:none;}
 .sp-avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;color:#0a0d12;flex:none;}
 .sp-pop{position:fixed;z-index:1000;background:var(--sp-surface);border:1px solid var(--sp-line);border-radius:var(--sp-r-md);box-shadow:0 18px 44px rgba(0,0,0,.55);padding:6px;font-family:var(--sp-font);color:var(--sp-text);font-size:14px;}
 .sp-pop-item{display:flex;align-items:center;gap:12px;width:100%;min-height:40px;padding:6px 10px;border:0;border-radius:var(--sp-r-sm);background:transparent;text-align:left;}

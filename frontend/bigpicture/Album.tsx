@@ -10,9 +10,8 @@ import type { Track } from '../features/music';
 import { plural } from '../pages/library/data';
 import { BpFrame, goBackBp, useClock } from './Frame';
 import { openGame } from './gameActions';
+import { openInstallWizard } from '../core/machines';
 import { AlbumCover, IconDownload, IconMusic, IconNowPlaying, IconPause, IconPlay, IconShuffle, NowPlayingPill, openPlayer, playAlbumBp } from './music';
-
-const w = window as any;
 
 /** L'état d'installation change pendant un téléchargement : relu régulièrement. */
 function useInstalled(app: any): boolean {
@@ -68,7 +67,7 @@ export function BpAlbum() {
 		music.shuffle(true);
 		playAlbumBp(appid);
 	};
-	const download = () => w.SteamClient?.Installs?.OpenInstallWizard?.([appid]);
+	const download = () => openInstallWizard([appid]);
 	const facts = [album && album.tracks.length ? `${plural(album.tracks.length, 'piste', 'pistes')} · ${totalLabel(album.seconds)}` : ''].filter(Boolean).join('');
 
 	return (
