@@ -101,6 +101,10 @@ ${hdrImages}
 .sp-dl:hover,.sp-dl[aria-current="page"]{border-color:var(--sp-accent);}
 .sp-dl svg{color:var(--sp-muted);}
 .sp-dl:hover svg,.sp-dl[aria-current="page"] svg,.sp-dl.sp-dl-active svg{color:var(--sp-accent);}
+/* Flèche qui descend en boucle pendant un téléchargement (pas en pause) */
+.sp-dl-moving .sp-dl-arrow{animation:sp-dl-drop 1.5s cubic-bezier(.45,0,.4,1) infinite;}
+@keyframes sp-dl-drop{0%{transform:translateY(-9px);opacity:0;}30%{transform:translateY(0);opacity:1;}72%{transform:translateY(0);opacity:1;}100%{transform:translateY(5px);opacity:0;}}
+@media (prefers-reduced-motion:reduce){.sp-dl-moving .sp-dl-arrow{animation:none;}}
 .sp-dl-bar{position:absolute;left:8px;right:8px;bottom:3px;height:2px;border-radius:1px;background:var(--sp-line);}
 .sp-dl-bar > i{display:block;height:100%;border-radius:1px;background:var(--sp-accent);}
 /* Menus de la barre : seul « Steam » reste, habillé ; les autres passent dans Paramètres › Steam */
@@ -517,6 +521,23 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI .InstallRequestModal .FolderOption .FreeSpace{flex:none;}
 .DesktopUI .InstallRequestModal .NoticeInstallFolder{color:var(--sp-muted) !important;font-size:13px !important;margin:0 !important;}
 .DesktopUI .InstallRequestModal .NoticeInstallFolder:not(:has(:not(:empty))){display:none;}
+/* Contrat de licence (EULA) demandé avant certaines installations : GenericDialogBase + EulaModalDialog */
+.DesktopUI .GenericDialogBase.EulaModalDialog{width:min(720px,calc(100vw - 48px)) !important;max-width:none !important;}
+.DesktopUI .EulaModalDialog .EulaDialogContent{gap:14px;color:var(--sp-muted) !important;font-size:14px !important;}
+.DesktopUI .EulaModalDialog .DialogContent_InnerWidth{max-width:none !important;}
+.DesktopUI .EulaModalDialog .EulaIntro{color:var(--sp-muted) !important;font-size:14px !important;line-height:1.5 !important;text-align:left !important;}
+.DesktopUI .EulaModalDialog .LanguageFieldContainer{margin:0 !important;color:var(--sp-muted) !important;}
+.DesktopUI .EulaModalDialog .LanguageFieldContainer :is(.Field,.FieldLabelRow,.FieldChildrenWithIcon,.FieldChildrenInner){background:transparent !important;border:0 !important;box-shadow:none !important;padding-left:0 !important;padding-right:0 !important;}
+.DesktopUI .EulaModalDialog .LanguageFieldContainer .FieldLabel{color:var(--sp-muted) !important;font-size:13px !important;font-weight:600 !important;text-transform:none !important;letter-spacing:0 !important;}
+.DesktopUI .EulaModalDialog .DialogDropDown{background:var(--sp-surface2) !important;background-image:none !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-sm) !important;color:var(--sp-text) !important;box-shadow:none !important;}
+.DesktopUI .EulaModalDialog .DialogDropDown:hover{border-color:var(--sp-accent) !important;}
+.DesktopUI .EulaModalDialog .DialogDropDown_Arrow svg,.DesktopUI .EulaModalDialog .DialogDropDown_Arrow svg *{fill:var(--sp-muted) !important;color:var(--sp-muted) !important;}
+.DesktopUI .EulaModalDialog .EULAScrolling{border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-md) !important;box-shadow:none !important;background:var(--sp-bg) !important;overflow-y:auto;}
+.DesktopUI .EulaModalDialog .EULAContent{background:transparent !important;border-radius:0 !important;padding:16px 18px !important;color:var(--sp-text) !important;font-size:13px !important;line-height:1.65 !important;}
+.DesktopUI .EulaModalDialog .EULAContent *{color:inherit !important;background:transparent !important;font-family:var(--sp-font) !important;}
+.DesktopUI .EulaModalDialog .EULAContent :is(h1,h2,h3,h4,b,strong){color:var(--sp-text) !important;}
+.DesktopUI .EulaModalDialog .EULAContent a{color:var(--sp-accent) !important;}
+.DesktopUI .EulaModalDialog .EULAError{background:var(--sp-surface2) !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-md) !important;color:var(--sp-text) !important;}
 .sp-avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;color:#0a0d12;flex:none;}
 .sp-pop{position:fixed;z-index:1000;background:var(--sp-surface);border:1px solid var(--sp-line);border-radius:var(--sp-r-md);box-shadow:0 18px 44px rgba(0,0,0,.55);padding:6px;font-family:var(--sp-font);color:var(--sp-text);font-size:14px;}
 .sp-pop-item{display:flex;align-items:center;gap:12px;width:100%;min-height:40px;padding:6px 10px;border:0;border-radius:var(--sp-r-sm);background:transparent;text-align:left;}

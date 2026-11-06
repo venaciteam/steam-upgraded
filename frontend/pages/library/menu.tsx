@@ -1,7 +1,7 @@
 // Menu contextuel d'un jeu (clic droit sur une jaquette ou une carte « Reprendre ») : le menu natif de Steam,
 // habillé (theme.ts, .sp-mi), avec en-tête, icônes et deux sous-menus (collections, gestion).
 import { findModuleExport, Menu, MenuGroup, MenuItem, MenuSeparator, showContextMenu } from 'millennium';
-import { gameActions } from '../../core/machines';
+import { gameActions, LOCAL_ID } from '../../core/machines';
 import { mainWindow, navigate, openProperties, openStorePage, ROUTES } from '../../core/steam';
 import { openArtworkDialog, resetArtwork } from '../../features/sgdb';
 import { isShortcut } from '../game/data';
@@ -88,7 +88,7 @@ export function uninstall(appid: number) {
 	const fn = steamDialogs().uninstall;
 	const win = mainWindow();
 	if (fn && win) fn([appid], win, false, '0');
-	else w.SteamClient?.Installs?.OpenUninstallWizard?.([appid], false);
+	else w.SteamClient?.Installs?.OpenUninstallWizard?.([appid], LOCAL_ID, false);
 }
 
 // ---------- Collections ----------
