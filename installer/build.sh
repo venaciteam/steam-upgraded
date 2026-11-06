@@ -18,7 +18,8 @@ fi
 LOCK=.reload.lock
 for i in $(seq 1 150); do mkdir "$LOCK" 2>/dev/null && break; sleep 2; done
 BACKEND_COPY=$(mktemp -d)
-trap 'cp -rf "$BACKEND_COPY/backend/." backend/ 2>/dev/null; rm -rf "$BACKEND_COPY"; rmdir "$LOCK" 2>/dev/null' EXIT
+# Rien ne doit échouer ici : sans plugin à compiler (SU_STAR_READY=1), aucune copie du backend n'a été faite.
+trap '[ -d "$BACKEND_COPY/backend" ] && cp -rf "$BACKEND_COPY/backend/." backend/ 2>/dev/null; rm -rf "$BACKEND_COPY"; rmdir "$LOCK" 2>/dev/null; true' EXIT
 
 mkdir -p installer/payload installer/dist
 if [ "${SU_STAR_READY:-}" = 1 ]; then
