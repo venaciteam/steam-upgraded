@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { appById, landscapeUrl, navigate, ROUTES } from '../core/steam';
 import { LOCAL_ID } from '../core/machines';
 import { useArt } from '../core/art';
-import { speedLabel } from '../shell/Downloads';
+import { localOverview, speedLabel } from '../shell/Downloads';
 import { openSteamSettings } from '../features/steamSettings';
 import { plural } from './library/data';
 import { IconClose } from './library/ui';
@@ -36,7 +36,7 @@ function itemBytes(it: any): [number, number] {
 
 function readState(): State {
 	const s = w.downloadsStore;
-	const ov = s?.DownloadOverview;
+	const ov = localOverview(s);
 	const appid = Number(ov?.update_appid || 0);
 	let active: Active | null = null;
 	if (appid) {

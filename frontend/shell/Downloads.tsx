@@ -7,10 +7,21 @@ const w = window as any;
 
 export type DlState = { active: boolean; paused: boolean; pct: number; name: string; queued: number; speed: number };
 
+/**
+ * État du téléchargement de cet ordinateur. Steam range désormais l'état par machine du compte : `DownloadOverview` est
+ * devenu une fonction (identifiant de machine), la machine locale a son accesseur `LocalDownloadOverview`.
+ */
+export function localOverview(store: any = w.downloadsStore): any {
+	if (!store) return null;
+	if ('LocalDownloadOverview' in store) return store.LocalDownloadOverview;
+	const ov = store.DownloadOverview;
+	return typeof ov === 'function' ? ov.call(store, '0') : ov;
+}
+
 /** État du téléchargement en cours (aussi utilisé par Big Picture). */
 export function readState(): DlState {
 	const store = w.downloadsStore;
-	const ov = store?.DownloadOverview;
+	const ov = localOverview(store);
 	const appid = Number(ov?.update_appid || 0);
 	const total = Number(ov?.update_bytes_to_download || 0);
 	const done = Number(ov?.update_bytes_downloaded || 0);

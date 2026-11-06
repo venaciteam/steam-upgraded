@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { DialogButton, Focusable, Menu, MenuItem, MenuSeparator } from 'millennium';
 import { appById, landscapeUrl } from '../core/steam';
 import { LOCAL_ID } from '../core/machines';
-import { speedLabel } from '../shell/Downloads';
+import { localOverview, speedLabel } from '../shell/Downloads';
 import { plural } from '../pages/library/data';
 import { BpFrame, goBackBp, useClock } from './Frame';
 import { HeroImage, Landscape, openGame, showBpMenu } from './gameActions';
@@ -38,7 +38,7 @@ function itemBytes(it: any): [number, number] {
 }
 
 function readActive(): Active | null {
-	const ov = store()?.DownloadOverview;
+	const ov = localOverview(store());
 	const appid = Number(ov?.update_appid || 0);
 	if (!appid) return null;
 	const p = ov?.progress?.[DOWNLOAD];
