@@ -65,7 +65,7 @@ export function buildCss(s: Settings): string {
 	const p3 = s.hdrWide
 		? `@media (color-gamut: p3){:root{--sp-accent:color(display-p3 ${(r / 255).toFixed(3)} ${(g / 255).toFixed(3)} ${(b / 255).toFixed(3)});}}`
 		: '';
-	const squircle = s.forme === 'squircle' ? `.sp-root,.sp-root *,.sp-topnav,.sp-topnav *,.sp-pop,.sp-pop *,.contextMenu,.contextMenuItem,.DownloadsPage .Section,.DownloadsPage .SectionItem,.DownloadsPage .DialogButton,.sp-steamset *,.DesktopUI .AppProperties *,.DesktopUI .GenericDialogBase,.DesktopUI .GenericDialogBase *,.DesktopUI .InstallRequestModal,.DesktopUI .InstallRequestModal *,.DesktopToastContainer .Middle,.DesktopToastContainer .AppLogo *{corner-shape:squircle;}` : '';
+	const squircle = s.forme === 'squircle' ? `.sp-root,.sp-root *,.sp-topnav,.sp-topnav *,.sp-pop,.sp-pop *,.contextMenu,.contextMenuItem,.DownloadsPage .Section,.DownloadsPage .SectionItem,.DownloadsPage .DialogButton,.sp-steamset *,.DesktopUI .AppProperties *,.DesktopUI .GenericDialogBase,.DesktopUI .GenericDialogBase *,.DesktopUI .InstallRequestModal,.DesktopUI .InstallRequestModal *,.DesktopUI .EulaModalDialog,.DesktopUI .EulaModalDialog *,.DesktopToastContainer .Middle,.DesktopToastContainer .AppLogo *{corner-shape:squircle;}` : '';
 	const hdrImages = s.hdrWide ? `.sp-root img{dynamic-range-limit:${s.hdrHalo ? 'no-limit' : 'constrained'};}` : '';
 	return `
 :root{${vars}}
@@ -403,7 +403,7 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI :is(.sp-steamset,.AppProperties) :is(:not(.Field) + .Field,.Field:first-child){border-top-width:1px !important;border-top-left-radius:var(--sp-r-lg) !important;border-top-right-radius:var(--sp-r-lg) !important;margin-top:12px !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .Field:not(:has(+ .Field)){border-bottom-left-radius:var(--sp-r-lg) !important;border-bottom-right-radius:var(--sp-r-lg) !important;margin-bottom:12px !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .Field::before,.DesktopUI :is(.sp-steamset,.AppProperties) .Field::after{display:none !important;}
-.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase,.InstallRequestModal),.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase,.InstallRequestModal) *:not(svg *){font-family:var(--sp-font) !important;}
+.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase,.InstallRequestModal,.EulaModalDialog),.DesktopUI :is(.sp-steamset,.AppProperties,.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) *:not(svg *){font-family:var(--sp-font) !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .FieldLabel,.DesktopUI :is(.sp-steamset,.AppProperties) .EntryLabel{color:var(--sp-text) !important;font-weight:700 !important;font-size:14px !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) :is(.FieldDescription,.EntryValue,.SettingsDialogBodyText,.SettingsDialogDescriptionText,.DialogBodyText,.SecondaryText,.Detail){color:var(--sp-muted) !important;}
 .DesktopUI :is(.sp-steamset,.AppProperties) .FieldDescription{font-size:12px !important;line-height:1.45 !important;}
@@ -466,21 +466,21 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 
 /* Dialogues natifs (activer un produit, désinstaller, confirmations…) */
 .DesktopUI .FullModalOverlay{background:rgba(0,0,0,.66) !important;}
-.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .ModalPosition_TopBar{display:none !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogContent_InnerWidth{overflow-x:hidden !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal){background:var(--sp-surface) !important;background-image:none !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-lg) !important;padding:28px !important;box-shadow:0 30px 80px rgba(0,0,0,.6) !important;color:var(--sp-text) !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal)::before,.DesktopUI :is(.GenericDialogBase,.InstallRequestModal)::after{display:none !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogHeader{color:var(--sp-text) !important;font-size:21px !important;font-weight:800 !important;text-transform:none !important;letter-spacing:0 !important;padding:0 40px 0 0 !important;margin:0 0 12px !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) :is(.DialogBodyText,.InfoBody){color:var(--sp-muted) !important;line-height:1.5 !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .InfoExampleHeader{color:var(--sp-muted) !important;font-size:11px !important;font-weight:700 !important;letter-spacing:.08em !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter{display:flex !important;justify-content:flex-end;gap:10px;margin-top:20px !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter > *{display:flex !important;gap:10px;flex:none !important;width:auto !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter .DialogButton{width:auto !important;min-width:0 !important;flex:none !important;margin:0 !important;}
-.DesktopUI :is(.GenericDialogBase,.InstallRequestModal) .DialogFooter .DialogButton.Secondary{order:-1;}
-.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .ModalPosition_Dismiss{top:16px !important;right:16px !important;width:32px !important;height:32px !important;z-index:2;}
-.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .closeButton{width:32px !important;height:32px !important;border-radius:50% !important;background:var(--sp-surface2) !important;display:flex !important;align-items:center;justify-content:center;corner-shape:round !important;}
-.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .closeButton svg{width:12px !important;height:12px !important;}
-.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal)) .closeButton svg *{stroke:var(--sp-muted) !important;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .ModalPosition_TopBar{display:none !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogContent_InnerWidth{overflow-x:hidden !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog){background:var(--sp-surface) !important;background-image:none !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-lg) !important;padding:28px !important;box-shadow:0 30px 80px rgba(0,0,0,.6) !important;color:var(--sp-text) !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)::before,.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)::after{display:none !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogHeader{color:var(--sp-text) !important;font-size:21px !important;font-weight:800 !important;text-transform:none !important;letter-spacing:0 !important;padding:0 40px 0 0 !important;margin:0 0 12px !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) :is(.DialogBodyText,.InfoBody){color:var(--sp-muted) !important;line-height:1.5 !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .InfoExampleHeader{color:var(--sp-muted) !important;font-size:11px !important;font-weight:700 !important;letter-spacing:.08em !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter{display:flex !important;justify-content:flex-end;gap:10px;margin-top:20px !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter > *{display:flex !important;gap:10px;flex:none !important;width:auto !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter .DialogButton{width:auto !important;min-width:0 !important;flex:none !important;margin:0 !important;}
+.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter .DialogButton.Secondary{order:-1;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .ModalPosition_Dismiss{top:16px !important;right:16px !important;width:32px !important;height:32px !important;z-index:2;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .closeButton{width:32px !important;height:32px !important;border-radius:50% !important;background:var(--sp-surface2) !important;display:flex !important;align-items:center;justify-content:center;corner-shape:round !important;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .closeButton svg{width:12px !important;height:12px !important;}
+.DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .closeButton svg *{stroke:var(--sp-muted) !important;}
 /* Installation d'un jeu (InstallRequestModal) : jeux à installer, raccourcis, choix du disque */
 .DesktopUI .InstallRequestModal{width:min(560px,calc(100vw - 48px)) !important;max-width:none !important;}
 .DesktopUI .InstallRequestModal :is(.DialogHeader,.DialogBody,.DialogBodyText,.AppsToInstall){border:0 !important;box-shadow:none !important;}
@@ -521,8 +521,9 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI .InstallRequestModal .FolderOption .FreeSpace{flex:none;}
 .DesktopUI .InstallRequestModal .NoticeInstallFolder{color:var(--sp-muted) !important;font-size:13px !important;margin:0 !important;}
 .DesktopUI .InstallRequestModal .NoticeInstallFolder:not(:has(:not(:empty))){display:none;}
-/* Contrat de licence (EULA) demandé avant certaines installations : GenericDialogBase + EulaModalDialog */
-.DesktopUI .GenericDialogBase.EulaModalDialog{width:min(720px,calc(100vw - 48px)) !important;max-width:none !important;}
+/* Contrat de licence (EULA) demandé avant certaines installations : GenericConfirmDialog + EulaModalDialog (sans GenericDialogBase) */
+.DesktopUI .EulaModalDialog{width:min(720px,calc(100vw - 48px)) !important;max-width:none !important;}
+.DesktopUI .EulaModalDialog :is(.DialogBodyText,.DialogBody){margin:0 !important;}
 .DesktopUI .EulaModalDialog .EulaDialogContent{gap:14px;color:var(--sp-muted) !important;font-size:14px !important;}
 .DesktopUI .EulaModalDialog .DialogContent_InnerWidth{max-width:none !important;}
 .DesktopUI .EulaModalDialog .EulaIntro{color:var(--sp-muted) !important;font-size:14px !important;line-height:1.5 !important;text-align:left !important;}
