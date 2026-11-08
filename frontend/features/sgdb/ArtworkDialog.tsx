@@ -30,13 +30,17 @@ const I_KEY = 'M15 7a4 4 0 1 1-3.9 4.9L4 19v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7z';
 
 // ---------- Petits composants ----------
 
-/** Image avec repli : si l'URL ne charge pas, on garde un fond neutre. */
+/** Aperçu vidéo : SteamGridDB donne les miniatures des visuels animés en WebM (le fichier appliqué reste un PNG animé). */
+const isVideo = (src: string) => /\.(webm|mp4)(\?|#|$)/i.test(src);
+
+/** Image (ou courte vidéo pour un animé) avec repli : si l'URL ne charge pas, on garde un fond neutre. */
 function Thumb({ src, style, fit = 'cover', alt = '' }: { src?: string | null; style?: CSSProperties; fit?: 'cover' | 'contain'; alt?: string }) {
 	const [broken, setBroken] = useState(false);
 	useEffect(() => setBroken(false), [src]);
+	const media: CSSProperties = { width: '100%', height: '100%', objectFit: fit, display: 'block' };
 	return (
 		<span style={{ display: 'block', overflow: 'hidden', background: 'var(--sp-surface2)', ...style }}>
-			{src && !broken && <img src={src} alt={alt} loading="lazy" onError={() => setBroken(true)} style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }} />}
+			{src && !broken && (isVideo(src) ? <video src={src} autoPlay muted loop playsInline preload="auto" aria-label={alt || undefined} onError={() => setBroken(true)} style={media} /> : <img src={src} alt={alt} loading="lazy" onError={() => setBroken(true)} style={media} />)}
 		</span>
 	);
 }
