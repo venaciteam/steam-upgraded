@@ -313,7 +313,13 @@ export function StoreTabs({ current }: { current: StoreTab }) {
 	);
 }
 
-export function OpenFullStore() {
+export function OpenFullStore({ icon }: { icon?: boolean }) {
+	if (icon)
+		return (
+			<button type="button" className="sp-btn sp-btn--icon" aria-label="Ouvrir le magasin Steam complet" title="Ouvrir le magasin Steam complet" onClick={() => openSteamWeb('https://store.steampowered.com/')}>
+				<IconExternal />
+			</button>
+		);
 	return (
 		<button type="button" className="sp-btn" onClick={() => openSteamWeb('https://store.steampowered.com/')} style={{ alignItems: 'center' }}>
 			<IconExternal />
@@ -329,6 +335,10 @@ export const STORE_CSS = `
 .sps-page button{align-items:center;}
 .sps-page button.sps-card{align-items:stretch;}
 .sps-hover{transition:background .12s,border-color .12s;}
+/* Recherche : ligne choisie au clavier ou à la souris */
+.sp-pop-item.sps-search-item{gap:12px;min-height:46px;}
+.sp-pop-item.sps-search-item[aria-selected="true"]{background:var(--sp-surface2);}
+.sp-pop-item.sps-search-item:not([aria-selected="true"]):hover{background:transparent;}
 .sps-row:hover,.sps-row:focus-visible{background:var(--sp-surface) !important;border-color:var(--sp-line) !important;}
 /* Contour de 2 px au survol : la bordure de 1 px plus une ombre pleine de 1 px (rien ne bouge) */
 .sps-card:hover,.sps-card:focus-visible{border-color:var(--sp-accent) !important;box-shadow:0 0 0 1px var(--sp-accent);}

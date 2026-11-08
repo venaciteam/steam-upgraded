@@ -1,8 +1,9 @@
 // Briques communes aux écrans Big Picture qui montrent des jeux : visuels, actions, menu d'options (X).
+import { useEffect, useState } from 'react';
 import { Menu, MenuItem, MenuSeparator, showContextMenu } from 'millennium';
 import { gameActions } from '../core/machines';
 import { useArt } from '../core/art';
-import { bpNavigate, bpWindow, coverUrl, heroUrl, ROUTES } from '../core/steam';
+import { bpNavigate, bpWindow, coverUrl, heroUrl, landscapeUrl, ROUTES } from '../core/steam';
 import { openArtworkDialog } from '../features/sgdb';
 import { heroCandidates, isShortcut } from '../pages/game/data';
 import { FallbackImg } from '../pages/Game';
@@ -78,9 +79,22 @@ export function HeroImage({ app, style }: { app: any; style?: any }) {
 	return <FallbackImg srcs={srcs} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', ...style }} />;
 }
 
+/**
+ * Jaquette verticale ; sans elle (aucune chez Steam pour certains jeux), l'en-tête du jeu sur un fond flou tiré de
+ * lui-même, comme au bureau (pages/library/Grid.tsx) et comme le fait Steam.
+ */
 export function Cover({ app, className }: { app: any; className: string }) {
 	const src = useArt(app, 'capsule', coverUrl(app));
-	return <FallbackImg srcs={[src]} alt="" className={className} loading="lazy" />;
+	const [wide, setWide] = useState(false);
+	useEffect(() => setWide(false), [src]);
+	if (!wide || isShortcut(app.appid)) return <FallbackImg srcs={[src]} alt="" className={className} loading="lazy" onFail={() => setWide(true)} />;
+	const header = landscapeUrl(app);
+	return (
+		<span className={className} style={{ position: 'relative', display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+			<img src={header} alt="" loading="lazy" style={{ position: 'absolute', inset: '-15%', width: '130%', height: '130%', objectFit: 'cover', filter: 'blur(24px) brightness(.55)' }} />
+			<img src={header} alt="" loading="lazy" style={{ position: 'relative', width: '100%', height: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,.45)' }} />
+		</span>
+	);
 }
 
 export function Landscape({ app, fallback, className }: { app: any; fallback: string; className: string }) {

@@ -422,6 +422,33 @@ local PEGI_FR = {
     ["in-game purchases"] = "achats en jeu", ["online"] = "jeu en ligne",
 }
 
+-- Espace disque lu dans le texte de la configuration requise (« Espace disque : 9 GB d'espace disque disponible »,
+-- « Storage: 500 MB available space »…), converti en Go.
+local DISK_LABELS = { "espace disque", "stockage", "storage", "hard drive", "hard disk", "disque dur" }
+local function disk_from_html(html)
+    if type(html) ~= "string" or html == "" then return nil end
+    local text = html:gsub("<[^>]*>", " "):lower()
+    for _, label in ipairs(DISK_LABELS) do
+        local at = text:find(label, 1, true)
+        if at then
+            local part = text:sub(at + #label, at + #label + 80)
+            local n, unit = part:match("^[^%d]-(%d+[%.,]?%d*)[^%a]*(%a+)")
+            n = n and tonumber((n:gsub(",", ".")))
+            if n and unit then
+                if unit == "gb" or unit == "go" or unit == "gib" then return n end
+                if unit == "mb" or unit == "mo" or unit == "mib" then return n / 1024 end
+                if unit == "tb" or unit == "to" then return n * 1024 end
+            end
+        end
+    end
+    return nil
+end
+
+local function disk_gb(req)
+    if type(req) ~= "table" then return nil end
+    return disk_from_html(req.recommended) or disk_from_html(req.minimum)
+end
+
 ---@ffi
 ---@param appid number
 ---@return string
@@ -488,6 +515,9 @@ function sp_store_app(appid)
         end
         out.pegiDescriptors = desc
     end
+    -- Espace disque de la configuration requise (recommandée, sinon minimale), en Go ; pas de chiffre si Steam n'en donne pas
+    out.diskGb = disk_gb(d.pc_requirements)
+    out.diskGbMac = disk_gb(d.mac_requirements)
     -- Avis, tags, fin de promo et grande bannière : GetItems
     local input = encode({
         ids = { { appid = appid } },
@@ -531,6 +561,47 @@ function sp_store_search(term)
         end
     end
     return encode({ ok = true, items = items })
+end
+
+-- ---------- Actualites et mises a jour d'un jeu ----------
+
+-- Evenements de la page communautaire du jeu (ceux que montre la bibliotheque de Steam), dans la langue du
+-- client quand l'editeur a traduit. Types : 12 petite mise a jour, 13 mise a jour, 14 mise a jour majeure ;
+-- les autres sont des actualites, evenements, promotions. Le texte reste en BBCode : le frontend le met en forme.
+local UPDATE_TYPES = { [12] = true, [13] = true, [14] = true }
+local NEWS_PAGE = 20
+
+---@ffi
+---@param appid number
+---@param offset number
+---@param updatesOnly boolean
+---@return string
+function sp_app_news(appid, offset, updatesOnly)
+    appid = tonumber(appid)
+    offset = math.max(0, math.floor(tonumber(offset) or 0))
+    if not appid then return encode({ ok = false, error = "jeu inconnu" }) end
+    local data, err = fetch_json("https://store.steampowered.com/events/ajaxgetpartnereventspageable/?clan_accountid=0&appid="
+        .. appid .. "&offset=" .. offset .. "&count=" .. NEWS_PAGE .. "&l=" .. LANG)
+    if type(data) ~= "table" then return encode({ ok = false, error = err or "actualites indisponibles" }) end
+    local events = type(data.events) == "table" and data.events or {}
+    local items = {}
+    for _, e in ipairs(events) do
+        local kind = num(e.event_type) or 0
+        local b = type(e.announcement_body) == "table" and e.announcement_body or {}
+        if (not updatesOnly or UPDATE_TYPES[kind]) and e.hidden ~= 1 and b.hidden ~= 1 then
+            items[#items + 1] = {
+                gid = str(e.gid),
+                type = kind,
+                title = str(b.headline) or str(e.event_name) or "",
+                time = num(e.rtime32_start_time) or num(b.posttime) or 0,
+                lang = num(b.language) or 0,
+                body = str(b.body) or "",
+                clan = str(e.clan_steamid),
+                announcement = str(b.gid),
+            }
+        end
+    end
+    return encode({ ok = true, items = items, nextOffset = offset + #events, more = #events >= NEWS_PAGE })
 end
 
 -- ---------- Pays et devise du magasin ----------

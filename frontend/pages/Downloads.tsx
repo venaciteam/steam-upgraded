@@ -2,9 +2,9 @@
 // le jeu en cours en grande carte, puis la file (en attente, planifiés) et les téléchargements terminés.
 import { useEffect, useState } from 'react';
 import { appById, landscapeUrl, navigate, ROUTES } from '../core/steam';
-import { LOCAL_ID } from '../core/machines';
+import { LOCAL_ID, sizeLabel } from '../core/machines';
 import { useArt } from '../core/art';
-import { localOverview, speedLabel } from '../shell/Downloads';
+import { localOverview, remainingLabel, speedLabel } from '../shell/Downloads';
 import { openSteamSettings } from '../features/steamSettings';
 import { plural } from './library/data';
 import { IconClose } from './library/ui';
@@ -84,22 +84,6 @@ function useDownloads(): State {
 // ---------- Formats ----------
 
 /** Tailles comme Steam (base 1024) : « 1,1 Go ». */
-function sizeLabel(bytes: number): string {
-	if (bytes <= 0) return '';
-	const go = bytes / 1024 ** 3;
-	if (go >= 1) return `${go.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
-	const mo = bytes / 1024 ** 2;
-	return mo >= 1 ? `${Math.round(mo)} Mo` : `${Math.max(1, Math.round(bytes / 1024))} ko`;
-}
-
-function remainingLabel(sec: number): string {
-	if (sec < 0) return '';
-	if (sec < 60) return 'moins d’une minute';
-	const m = Math.round(sec / 60);
-	if (m < 60) return `${m} min`;
-	return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
-}
-
 function dayLabel(rt: number): string {
 	const d = new Date(rt * 1000);
 	const today = new Date();

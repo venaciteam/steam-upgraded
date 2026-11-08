@@ -1,25 +1,38 @@
 // Grille de jaquettes. Au survol, la tuile s'agrandit sur place et révèle un panneau d'infos sous la jaquette.
-// Tout passe par le CSS (:hover + transition-delay) : aucun état partagé, la grille ne se re-rend jamais au survol.
-// Seul état local : le panneau n'est monté qu'au premier survol (ou focus) de la tuile.
-import { memo, useEffect, useState } from 'react';
+// Le survol est une classe posée sur la seule tuile survolée (.spl-hov), sans rendu React, et seulement sur un vrai
+// mouvement de souris : quand la grille défile sous un curseur immobile, rien ne s'agrandit. Les délais sont en CSS.
+// Aucune classe n'est jamais basculée sur la grille entière (environ 55 ms de styles à chaque fois, à-coups au défilement).
+// Seul état React : le panneau n'est monté que si le curseur se pose sur la tuile (ou au focus).
+import { memo, useEffect, useRef, useState } from 'react';
 import { avatarUrl, formatLastPlayed, navigate, ROUTES } from '../../core/steam';
 import { formatBigHours, Game, keyOf, loadOwners, Owner } from './data';
 import { useArt } from '../../core/art';
 import { useAlbumCover } from '../../features/music';
 import { Dot, IconCheck, IconCopies, PlayButton } from './ui';
 import { openGameMenu } from './menu';
+import { isShortcut, useGameSize } from '../game/data';
 
+/**
+ * Jaquette verticale ; sans elle (vieux jeux, contenus séparés : aucune jaquette chez Steam), l'image d'en-tête posée
+ * sur un fond flou tiré d'elle-même, comme le fait Steam ; sans en-tête non plus, le nom du jeu.
+ */
 function Cover({ g }: { g: Game }) {
 	const src = useArt(g.app, 'capsule', g.cover);
-	const [broken, setBroken] = useState(false);
-	useEffect(() => setBroken(false), [src]);
-	if (!src || broken)
+	const [stage, setStage] = useState(0);
+	useEffect(() => setStage(0), [src]);
+	if (src && stage === 0) return <img src={src} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setStage(1)} />;
+	if (g.landscape && stage < 2 && !isShortcut(g.appid))
 		return (
-			<span className="spl-cover-fallback">
-				<span>{g.name}</span>
+			<span className="spl-cover-wide">
+				<img className="spl-cw-bg" src={g.landscape} alt="" loading="lazy" decoding="async" draggable={false} />
+				<img className="spl-cw-fg" src={g.landscape} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setStage(2)} />
 			</span>
 		);
-	return <img src={src} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} />;
+	return (
+		<span className="spl-cover-fallback">
+			<span>{g.name}</span>
+		</span>
+	);
 }
 
 /** Petite photo de profil d'un propriétaire (contour à sa couleur), point coloré si la photo manque. */
@@ -87,6 +100,7 @@ function Owners({ g }: { g: Game }) {
 
 /** Panneau révélé sous la jaquette quand la tuile est agrandie. Fait partie de la tuile. */
 function TilePanel({ g, maxMins, onOpen }: { g: Game; maxMins: number; onOpen: () => void }) {
+	const { size, installed } = useGameSize(g.app);
 	return (
 		<div className="spl-panel" onClick={onOpen}>
 			<span className="spl-surface" aria-hidden="true" />
@@ -106,6 +120,11 @@ function TilePanel({ g, maxMins, onOpen }: { g: Game; maxMins: number; onOpen: (
 				{g.last > 0 && (
 					<span className="spl-pline">
 						<span className="spl-pmuted">Dernière session</span> <b>{formatLastPlayed(g.last)}</b>
+					</span>
+				)}
+				{size && (
+					<span className="spl-pline">
+						<span className="spl-pmuted">{installed ? 'Sur le disque' : 'Taille'}</span> <b>{size}</b>
 					</span>
 				)}
 				{g.copies > 1 ? (
@@ -136,16 +155,68 @@ function TilePanel({ g, maxMins, onOpen }: { g: Game; maxMins: number; onOpen: (
 	);
 }
 
+// Tuile survolée (une seule à la fois), dernière position du curseur à l'écran, dernier défilement
+let hovered: HTMLElement | null = null;
+const lastPos = { x: -1, y: -1 };
+let scrolledAt = 0;
+/** Pendant un défilement et 250 ms après, aucun survol : même si la souris bouge un peu en tournant la molette,
+ * les tuiles ne s'agrandissent pas en passant (chaque agrandissement coûtait des images de 100 à 150 ms). */
+const SCROLL_CALM = 250;
+function realMove(e: any): boolean {
+	const moved = e.screenX !== lastPos.x || e.screenY !== lastPos.y;
+	lastPos.x = e.screenX;
+	lastPos.y = e.screenY;
+	return moved && performance.now() - scrolledAt > SCROLL_CALM;
+}
+function setHovered(el: HTMLElement) {
+	if (hovered && hovered !== el) hovered.classList.remove('spl-hov');
+	hovered = el;
+	el.classList.add('spl-hov');
+}
+function unhover(el: HTMLElement) {
+	el.classList.remove('spl-hov');
+	if (hovered === el) hovered = null;
+}
+/** Le défilement referme la tuile agrandie (appelé par la page au défilement). */
+export function collapseHovered() {
+	scrolledAt = performance.now();
+	if (hovered) unhover(hovered);
+}
+
 type TileProps = { g: Game; maxMins: number; under: boolean; onChanged: () => void };
 
 export const Tile = memo(function Tile({ g, maxMins, under, onChanged }: TileProps) {
 	const [armed, setArmed] = useState(false);
+	// Carte de survol montée seulement si le curseur se pose sur la tuile (elle n'apparaît qu'après 0,27 s) : pendant un
+	// défilement à la molette, les tuiles qui passent sous le curseur ne montent plus rien (mises en page en rafale, saccades).
+	const timer = useRef<any>(0);
 	const arm = () => {
+		clearTimeout(timer.current);
 		if (!armed) setArmed(true);
+	};
+	const armSoon = () => {
+		if (armed) return;
+		clearTimeout(timer.current);
+		timer.current = setTimeout(arm, 150);
+	};
+	useEffect(() => () => clearTimeout(timer.current), []);
+	// Vrai mouvement de souris (position à l'écran changée) : la tuile passe en survol. Les évènements que Chromium simule
+	// pendant un défilement gardent la même position : ignorés.
+	const onPointer = (e: any) => {
+		if (!realMove(e)) return;
+		const el = e.currentTarget as HTMLElement;
+		if (!el.classList.contains('spl-hov')) {
+			setHovered(el);
+			armSoon();
+		}
+	};
+	const onLeave = (e: any) => {
+		clearTimeout(timer.current);
+		unhover(e.currentTarget as HTMLElement);
 	};
 	const open = () => navigate(ROUTES.app(g.appid));
 	return (
-		<div className="spl-tile" onMouseEnter={arm} onFocus={arm} onContextMenu={(e) => openGameMenu(e, g, onChanged)}>
+		<div className="spl-tile" onMouseEnter={onPointer} onMouseMove={onPointer} onMouseLeave={onLeave} onFocus={arm} onContextMenu={(e) => openGameMenu(e, g, onChanged)}>
 			<div className="spl-tcard">
 				<button type="button" className="spl-hit" aria-label={`${g.name}${under ? '' : `, ${formatBigHours(g.mins)} de jeu`}${g.copies > 1 ? `, ${g.copies} copies dans la famille` : ''}`} onClick={open}>
 					<span className="spl-cover" data-sp-appid={g.appid} data-sp-kind="tile">
@@ -206,9 +277,8 @@ export function AlbumTile({ g }: { g: Game }) {
 }
 
 // États « agrandi » : survol (après un délai, pour qu'un balayage ne déclenche rien) ou focus clavier (immédiat).
-// .spl-noexp est posée sur la grille pendant un défilement et retirée au prochain vrai mouvement de souris.
-const H = '.spl-grid:not(.spl-noexp) .spl-tile:hover';
-const F = '.spl-grid:not(.spl-noexp) .spl-tile:has(:focus-visible)';
+const H = '.spl-tile.spl-hov';
+const F = '.spl-tile:has(:focus-visible)';
 const both = (sel: string) => `${H} ${sel},${F} ${sel}`;
 const DELAY = '.27s';
 
@@ -226,6 +296,9 @@ ${F} .spl-tcard{transform:scale(1.07);}
 .spl-hit{display:flex;flex-direction:column;gap:10px;width:100%;padding:0;border:0;background:transparent;text-align:left;color:var(--sp-text);min-width:0;outline:none;}
 .spl-cover{position:relative;display:block;aspect-ratio:2/3;border-radius:var(--sp-r-cover);overflow:hidden;background:var(--sp-surface2);outline:1.5px solid transparent;outline-offset:0;}
 .spl-cover img{display:block;width:100%;height:100%;object-fit:cover;}
+.spl-cover-wide{position:relative;display:flex;align-items:center;width:100%;height:100%;overflow:hidden;background:var(--sp-surface2);}
+.spl-cover .spl-cw-bg{position:absolute;inset:-15%;width:130%;height:130%;object-fit:cover;filter:blur(18px) brightness(.55);}
+.spl-cover .spl-cw-fg{position:relative;width:100%;height:auto;object-fit:contain;box-shadow:0 8px 24px rgba(0,0,0,.45);}
 .spl-cover-fallback{display:flex;align-items:flex-end;width:100%;height:100%;padding:14px;font-weight:800;font-size:14px;color:var(--sp-muted);background:var(--sp-surface2);}
 .spl-hit:focus-visible .spl-cover{outline-color:var(--sp-accent);}
 .spl-oled .spl-cover{outline-color:var(--sp-line);outline-width:1px;}

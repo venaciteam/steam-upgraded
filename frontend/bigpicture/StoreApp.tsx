@@ -6,13 +6,14 @@ import { DialogButton, Focusable } from 'millennium';
 import { usePath } from '../core/history';
 import { useSettings } from '../core/settings';
 import { myAccountId } from '../core/steam';
-import { capitalize, FRENCH, money, int, loadStoreApp, loadWishlist, mySteamId, ownershipMap, pegiColor, playFeatures, promoEndWhen, reviewTone, setWishlisted, storeUrl, useAsync } from '../pages/store/data';
+import { capitalize, FRENCH, money, int, storeDiskLabel, loadStoreApp, loadWishlist, mySteamId, ownershipMap, pegiColor, playFeatures, promoEndWhen, reviewTone, setWishlisted, storeUrl, useAsync } from '../pages/store/data';
 import type { StoreApp } from '../pages/store/data';
 import { FallbackImg } from '../pages/Game';
 import { BpFrame, goBackBp, MemberAvatar } from './Frame';
 import { openGame } from './gameActions';
 import { openSteamWebBp } from './StoreBar';
 import { playDash } from './dash';
+import { BpNews } from './News';
 
 const HeartIcon = ({ on }: { on: boolean }) => (
 	// var() ne marche pas dans un attribut SVG : couleurs en style
@@ -129,6 +130,17 @@ function BuyPanel({ app, wished, busy, onWish }: { app: StoreApp; wished: boolea
 					</span>
 				</span>
 			</Focusable>
+			{storeDiskLabel(app) && (
+				<span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 19 }}>
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none', color: 'var(--sp-muted)' }}>
+						<ellipse cx="12" cy="6" rx="8" ry="3" />
+						<path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+					</svg>
+					<span>
+						<b>{storeDiskLabel(app)}</b> <span style={{ color: 'var(--sp-muted)' }}>d’espace disque nécessaire</span>
+					</span>
+				</span>
+			)}
 			{!mine && <span style={{ fontSize: 16, color: 'var(--sp-muted)' }}>Le paiement se fait sur la page de Steam : rien n’est acheté depuis cet écran.</span>}
 		</div>
 	);
@@ -315,6 +327,8 @@ export function BpStoreApp() {
 					)}
 				</Card>
 			</section>
+
+			<BpNews appid={appid} />
 
 			{viewer && shown && (
 				<div className="spbp-viewer" aria-live="polite">

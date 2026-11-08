@@ -205,6 +205,20 @@ const RAW = `
 .spbp-day{display:flex;align-items:center;gap:18px;margin:6px 0 2px;font-size:15px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--sp-muted);}
 .spbp-day::before,.spbp-day::after{content:"";flex:1;height:1px;background:var(--sp-line);}
 
+/* Mises à jour d'un jeu (fiche, page de vente) : liste, aperçu, lecteur plein écran */
+.spbp .spbp-news-item.DialogButton,.spbp button.spbp-news-item{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;padding:20px 26px;border-radius:24px;border:1px solid var(--sp-line);background:var(--sp-surface);color:var(--sp-text);font-family:var(--sp-font);cursor:pointer;outline:4px solid transparent;outline-offset:3px;}
+.spbp .spbp-news-item.gpfocus{background:var(--sp-surface2);border-color:transparent;outline-color:var(--sp-accent);box-shadow:var(--spbp-glow);}
+.spbp-news-badge{align-self:flex-start;padding:4px 11px;border-radius:12px;font-size:14px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:var(--sp-surface2);color:var(--sp-muted);border:1px solid transparent;}
+.spbp .spbp-news-item.gpfocus .spbp-news-badge{background:var(--sp-bg);}
+.spbp-news-badge--13{background:transparent;color:var(--sp-accent);border-color:var(--sp-accent);}
+.spbp-news-badge--14{background:var(--sp-accent) !important;color:var(--sp-accent-ink);border-color:var(--sp-accent);}
+.spbp-news-preview{position:relative;flex:1;min-width:0;height:640px;border-radius:28px;background:var(--sp-surface);border:1px solid var(--sp-line);padding:30px 36px;overflow:hidden;font-size:21px;}
+.spbp-news-preview::after{content:"";position:absolute;left:0;right:0;bottom:0;height:140px;background:linear-gradient(to bottom,transparent,var(--sp-surface));pointer-events:none;}
+.spbp-news-reader{position:fixed;inset:0 0 var(--spbp-footer) 0;z-index:30;background:var(--sp-bg);display:flex;flex-direction:column;}
+.spbp-news-reader-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:56px 0 80px;}
+.spbp-news-reader-in{max-width:1200px;margin:0 auto;padding:0 72px;font-size:24px;}
+.spbp-news-reader-hint{display:flex;justify-content:center;align-items:center;gap:14px;padding:16px;border-top:1px solid var(--sp-line);font-size:19px;color:var(--sp-muted);}
+
 /* Magasin : accès à la liste de souhaits et au panier, lignes du panier */
 .spbp .spbp-storelink.DialogButton,.spbp button.spbp-storelink{all:unset;box-sizing:border-box;flex:1;display:flex;align-items:center;gap:16px;min-height:58px;padding:0 22px;border-radius:24px;border:2px solid var(--sp-line);background:var(--sp-surface2);color:var(--sp-text);font-family:var(--sp-font);font-size:23px;font-weight:800;white-space:nowrap;cursor:pointer;outline:3px solid transparent;outline-offset:4px;}
 .spbp .spbp-storelink.gpfocus{outline-color:var(--sp-accent);box-shadow:var(--spbp-glow);}
@@ -219,7 +233,7 @@ const RAW = `
 
 // Les boutons de Steam (DialogButton) ont des règles très spécifiques (button.x.DialogButton:enabled…) :
 // les nôtres passent en !important pour l'emporter.
-const BUTTON_CLASSES = /spbp-(btn|capsule|tile|view|row|wish|deal|pill|chip-btn|card-btn|ach|result|empty|track|round|friend|storelink|cartline)\b/;
+const BUTTON_CLASSES = /spbp-(btn|capsule|tile|view|row|wish|deal|pill|chip-btn|card-btn|ach|result|empty|track|round|friend|storelink|cartline|news-item)\b/;
 
 export const BP_CSS = RAW.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, sel: string, body: string) => {
 	if (!BUTTON_CLASSES.test(sel) || sel.trim().startsWith('@')) return rule;

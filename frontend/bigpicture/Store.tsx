@@ -11,7 +11,7 @@ import { useSettings } from '../core/settings';
 import { bpNavigate, bpWindow, myAccountId, ROUTES } from '../core/steam';
 import { BpFrame, goBackBp, MemberAvatar } from './Frame';
 import { openSteamWebBp } from './StoreBar';
-import { BpStoreLink } from './storeLinks';
+import { BpStoreLink, BpStoreSearchLink } from './storeLinks';
 
 /** Filtres rapides ; « Moins de … » suit la devise du magasin (absent pour une devise non prévue). */
 function pills(): { id: string; label: string; filters: Filters }[] {
@@ -254,6 +254,7 @@ export function BpStore() {
 			<Focusable flow-children="row" style={{ margin: '34px 64px 0', display: 'flex', gap: 24, alignItems: 'stretch' }}>
 				<Banner featured={featured.data} total={total} onSale={onSale} wl={wl} />
 				<Focusable flow-children="column" aria-label="Votre magasin" style={{ width: 330, flex: 'none', display: 'flex', flexDirection: 'column', gap: 16 }}>
+					<BpStoreSearchLink />
 					<BpStoreLink to="wishlist" />
 					<BpStoreLink to="cart" />
 				</Focusable>

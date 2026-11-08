@@ -1,7 +1,7 @@
 [plugin]
 id = "com.venacity.steamupgraded"
 name = "Steam Upgraded"
-version = "0.2.1"
+version = "0.2.2"
 author = "Venacity"
 description = "Une nouvelle interface pour Steam : bibliothèque, fiches de jeu, magasin, paramètres et Big Picture."
 

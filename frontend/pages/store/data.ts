@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { findModuleExport } from 'millennium';
 import { allApps, lenderOf, Member } from '../../core/steam';
+import { sizeLabel, systemName } from '../../core/machines';
 import type { Filters, SortId } from './ui';
 
 // ---------- Types renvoyés par backend/store.lua ----------
@@ -229,9 +230,19 @@ export type StoreApp = {
 	metacritic?: number;
 	pegi?: string;
 	pegiDescriptors: string[];
+	/** Espace disque demandé par la configuration requise, en Go (Windows, Mac). */
+	diskGb?: number;
+	diskGbMac?: number;
 	screenshots: { thumb: string; full: string }[];
 	movies: { thumb: string; name?: string }[];
 };
+
+/** Espace disque demandé par la configuration requise du système affiché (« 9 Go »), vide si Steam ne le donne pas. */
+export function storeDiskLabel(app: StoreApp): string {
+	const gb = systemName() === 'Mac' ? app.diskGbMac : app.diskGb;
+	if (!(Number(gb) > 0)) return '';
+	return sizeLabel(Number(gb) * 1024 ** 3);
+}
 
 export function loadStoreApp(appid: number, force = false): Promise<StoreApp> {
 	return cached(`app:${appid}`, async () => {

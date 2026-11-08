@@ -97,7 +97,7 @@ ${hdrImages}
 .sp-account-host{display:flex;align-items:center;-webkit-app-region:no-drag;}
 .sp-native-account{display:none !important;}
 .sp-dl-host{display:flex;align-items:center;margin-right:8px;-webkit-app-region:no-drag;}
-.sp-dl{position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:30px;padding:0;border-radius:15px;border:1px solid var(--sp-line);background:var(--sp-surface2);color:var(--sp-text);font-family:var(--sp-font);font-weight:700;font-size:13px;cursor:pointer;overflow:hidden;-webkit-app-region:no-drag;corner-shape:round !important;}
+.sp-dl{position:relative;display:flex;align-items:center;justify-content:center;gap:7px;min-width:34px;height:30px;padding:0 13px 0 11px;white-space:nowrap;font-variant-numeric:tabular-nums;border-radius:15px;border:1px solid var(--sp-line);background:var(--sp-surface2);color:var(--sp-text);font-family:var(--sp-font);font-weight:700;font-size:13px;cursor:pointer;overflow:hidden;-webkit-app-region:no-drag;corner-shape:round !important;}
 .sp-dl:hover,.sp-dl[aria-current="page"]{border-color:var(--sp-accent);}
 .sp-dl svg{color:var(--sp-muted);}
 .sp-dl:hover svg,.sp-dl[aria-current="page"] svg,.sp-dl.sp-dl-active svg{color:var(--sp-accent);}
@@ -107,6 +107,20 @@ ${hdrImages}
 @media (prefers-reduced-motion:reduce){.sp-dl-moving .sp-dl-arrow{animation:none;}}
 .sp-dl-bar{position:absolute;left:8px;right:8px;bottom:3px;height:2px;border-radius:1px;background:var(--sp-line);}
 .sp-dl-bar > i{display:block;height:100%;border-radius:1px;background:var(--sp-accent);}
+.sp-dl svg{flex:none;}
+.sp-dl-text{line-height:1;}
+.sp-dl-active .sp-dl-text{color:var(--sp-text);}
+/* Bulle du bouton Téléchargements (au survol) : téléchargement en cours et avancement */
+.sp-pop.sp-dl-tip{width:280px;box-sizing:border-box;padding:12px 14px;display:flex;flex-direction:column;gap:6px;pointer-events:none;font-size:13px;animation:sp-dl-tip-in .14s ease-out;}
+.sp-pop.sp-dl-tip--idle{width:auto;padding:10px 16px;text-align:center;align-items:center;}
+.sp-dl-tip-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sp-dl-tip-row{display:flex;align-items:center;gap:10px;font-variant-numeric:tabular-nums;}
+.sp-dl-tip-row strong{min-width:44px;text-align:right;}
+.sp-dl-tip-bar{flex:1;height:4px;border-radius:2px;background:var(--sp-line);overflow:hidden;}
+.sp-dl-tip-bar > i{display:block;height:100%;border-radius:2px;background:var(--sp-accent);transition:width .6s ease;}
+.sp-dl-tip-facts{font-size:12.5px;font-variant-numeric:tabular-nums;}
+@keyframes sp-dl-tip-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){.sp-dl-tip{animation:none;}.sp-dl-tip-bar > i{transition:none;}}
 /* Menus de la barre : seul « Steam » reste, habillé ; les autres passent dans Paramètres › Steam */
 .RootMenuBar{padding-left:10px !important;gap:0;}
 .RootMenuBar > .RootMenuButton:not(:first-child){display:none !important;}
@@ -284,11 +298,13 @@ body.sp-idle .TopBar,body.sp-idle .BottomBarContainer{opacity:.35;transition:opa
 .sp-player-right .sp-player-btn{color:var(--sp-muted);}
 body.sp-has-player .sp-root{padding-bottom:110px;}
 /* Fenêtres-dialogues natives (À propos de Steam, Ajouter un jeu non Steam…) : fond du thème, barre de fenêtre transparente au-dessus du contenu */
+/*@sp:dialog-window body.ModalDialogBody*/
 .ModalDialogBody.DesktopUI:not(:has(.AppProperties)),.ModalDialogBody.DesktopUI:not(:has(.AppProperties)) .PopupFullWindow,.ModalDialogBody.DesktopUI:not(:has(.AppProperties)) .ModalPosition_Content > .DialogContent{background:var(--sp-surface) !important;background-image:none !important;}
 .ModalDialogBody.DesktopUI:not(:has(.AppProperties)) .PopupFullWindow > .TitleBar{background:transparent !important;box-shadow:none !important;}
 .ModalDialogBody.DesktopUI:not(:has(.AppProperties)) .ModalPosition_TopBar{display:none !important;}
 .ModalDialogBody.DesktopUI:not(:has(.AppProperties)) .ModalPosition_Content > .DialogContent{font-family:var(--sp-font) !important;}
 .ModalDialogBody.DesktopUI:not(:has(.AppProperties)) .ModalPosition_Content > .DialogContent *{font-family:var(--sp-font) !important;}
+/*@sp:end*/
 .DesktopUI .AboutSteamDialog .DialogHeader svg{color:var(--sp-text) !important;fill:var(--sp-text) !important;}
 .DesktopUI .AboutSteamDialog .DialogBodyLabel{color:var(--sp-muted) !important;}
 .DesktopUI .AboutSteamDialog .DialogBodyText{color:var(--sp-text) !important;}
@@ -315,6 +331,7 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI .ServerBrowserDialog [class*="ColumnResizer"]{background:var(--sp-line) !important;border:0 !important;width:1px !important;}
 .DesktopUI .ServerBrowserDialog [class*="CurrentFiltersSummaryText"],.DesktopUI .ServerBrowserDialog .DialogLabel{color:var(--sp-muted) !important;}
 /* Mode réduit (menu Afficher › Mode réduit) : liste compacte native de la bibliothèque */
+/*@sp:native-list .GameListEntryContainer*/
 [class*="ContentFrame"]:has(.GameListEntryContainer){background:var(--sp-bg) !important;font-family:var(--sp-font) !important;}
 [class*="ContentFrame"]:has(.GameListEntryContainer) *{font-family:var(--sp-font) !important;}
 [class*="ContentFrame"]:has(.GameListEntryContainer) [class*="Container"]{background-image:none !important;}
@@ -327,8 +344,12 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 [class*="ContentFrame"]:has(.GameListEntryContainer) [class*="Container"]:has(> .GameListEntryContainer){border-radius:8px;}
 [class*="ContentFrame"]:has(.GameListEntryContainer) [class*="Container"]:has(> .GameListEntryContainer):hover{background:var(--sp-surface2) !important;}
 [class*="ContentFrame"]:has(.GameListEntryContainer) .GameListEntryContainer img{border-radius:5px;}
+/*@sp:end*/
 /* Ajouter un jeu non Steam (fenêtre native) : liste en carte, lignes, cases et en-tête aux couleurs du thème */
-.ModalDialogBody.DesktopUI:has(.AddNonSteamGameDialog),.DesktopUI .AddNonSteamGameDialog{background:var(--sp-surface) !important;}
+.DesktopUI .AddNonSteamGameDialog{background:var(--sp-surface) !important;}
+/*@sp:dialog-window-2 body.ModalDialogBody*/
+.ModalDialogBody.DesktopUI:has(.AddNonSteamGameDialog){background:var(--sp-surface) !important;}
+/*@sp:end*/
 .DesktopUI .AddNonSteamGameDialog{font-family:var(--sp-font) !important;}
 .DesktopUI .AddNonSteamGameDialog *{font-family:var(--sp-font) !important;}
 .DesktopUI .AddNonSteamGameDialog .DialogBodyText{color:var(--sp-muted) !important;margin-bottom:12px !important;}
@@ -444,8 +465,11 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .sp-steamset .FatButton .Details{color:var(--sp-muted) !important;}
 
 /* Fenêtre Propriétés d'un jeu */
-.ModalDialogBody.DesktopUI:has(.AppProperties),.DesktopUI .AppProperties,.DesktopUI .AppProperties :is(.PagedSettingDialog_ContentColumn,.PagedSettingsDialog_PageContent){background:var(--sp-bg) !important;}
+.DesktopUI .AppProperties,.DesktopUI .AppProperties :is(.PagedSettingDialog_ContentColumn,.PagedSettingsDialog_PageContent){background:var(--sp-bg) !important;}
+/*@sp:dialog-window-3 body.ModalDialogBody*/
+.ModalDialogBody.DesktopUI:has(.AppProperties){background:var(--sp-bg) !important;}
 .ModalDialogBody.DesktopUI:has(.AppProperties) .TitleBar{background:transparent !important;}
+/*@sp:end*/
 .DesktopUI .AppProperties .PagedSettingsDialog_PageListColumn{background:var(--sp-surface) !important;border-right:1px solid var(--sp-line);padding:44px 12px 12px !important;box-sizing:border-box;}
 .DesktopUI .AppProperties .PagedSettingsDialog_Title{padding:0 12px 14px !important;margin:0 !important;font-size:16px !important;font-weight:800 !important;line-height:1.25 !important;color:var(--sp-text) !important;text-transform:none !important;letter-spacing:0 !important;white-space:normal !important;}
 .DesktopUI .AppProperties .PagedSettingsDialog_Title::before{content:"Propriétés";display:block;margin-bottom:4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-muted);}
@@ -466,7 +490,9 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 
 /* Dialogues natifs (activer un produit, désinstaller, confirmations…) */
 .DesktopUI .FullModalOverlay{background:rgba(0,0,0,.66) !important;}
+/*@sp:modal .ModalPosition*/
 .DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .ModalPosition_TopBar{display:none !important;}
+/*@sp:end*/
 .DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogContent_InnerWidth{overflow-x:hidden !important;}
 .DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog){background:var(--sp-surface) !important;background-image:none !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-lg) !important;padding:28px !important;box-shadow:0 30px 80px rgba(0,0,0,.6) !important;color:var(--sp-text) !important;}
 .DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)::before,.DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)::after{display:none !important;}
@@ -477,10 +503,12 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter > *{display:flex !important;gap:10px;flex:none !important;width:auto !important;}
 .DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter .DialogButton{width:auto !important;min-width:0 !important;flex:none !important;margin:0 !important;}
 .DesktopUI :is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog) .DialogFooter .DialogButton.Secondary{order:-1;}
+/*@sp:modal-2 .ModalPosition*/
 .DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .ModalPosition_Dismiss{top:16px !important;right:16px !important;width:32px !important;height:32px !important;z-index:2;}
 .DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .closeButton{width:32px !important;height:32px !important;border-radius:50% !important;background:var(--sp-surface2) !important;display:flex !important;align-items:center;justify-content:center;corner-shape:round !important;}
 .DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .closeButton svg{width:12px !important;height:12px !important;}
 .DesktopUI .ModalPosition:has(:is(.GenericDialogBase,.InstallRequestModal,.EulaModalDialog)) .closeButton svg *{stroke:var(--sp-muted) !important;}
+/*@sp:end*/
 /* Installation d'un jeu (InstallRequestModal) : jeux à installer, raccourcis, choix du disque */
 .DesktopUI .InstallRequestModal{width:min(560px,calc(100vw - 48px)) !important;max-width:none !important;}
 .DesktopUI .InstallRequestModal :is(.DialogHeader,.DialogBody,.DialogBodyText,.AppsToInstall){border:0 !important;box-shadow:none !important;}
@@ -706,6 +734,8 @@ body.client_chat_frame,.friendlist,.chat_main,.popup_chat_frame{background:var(-
 
 /* Fenêtre étroite : on compacte plutôt que de pousser les boutons hors de la barre (en fin de feuille pour l'emporter) */
 @media (max-width:1380px){
+.sp-dl{padding:0 !important;width:34px;}
+.sp-dl-text{display:none !important;}
 .TopBar > .TitleBar .GamepadUIToggle{padding:0 !important;width:34px !important;justify-content:center;}
 .TopBar > .TitleBar .GamepadUIToggle::after{content:none;}
 .sp-presence > span:nth-child(2){display:none !important;}
@@ -728,8 +758,32 @@ body.client_chat_frame,.friendlist,.chat_main,.popup_chat_frame{background:var(-
 `;
 }
 
+/**
+ * Sections de la feuille actives seulement quand leur cible existe dans la fenêtre : `/*@sp:<nom> <sonde>*\/ … /*@sp:end*\/`.
+ * Sonde : `.Classe` (un élément de cette classe existe) ou `body.Classe` (classe du body). Raison : une règle dont un
+ * ancêtre porte `:has()` (`X:has(…) Y`) oblige Chromium à recalculer les styles de tout le document à chaque élément
+ * ajouté (mesuré : 60 ms au lieu de 12 pour un simple <span> dans la Bibliothèque, saccades au survol et au défilement).
+ * Ces règles ne servent qu'à des fenêtres ou des écrans natifs précis : elles ne pèsent plus sur nos pages.
+ */
+const SECTION = /\/\*@sp:([\w-]+) ([^*]+)\*\/([\s\S]*?)\/\*@sp:end\*\//g;
+
+function probeMatches(doc: Document, probe: string): boolean {
+	if (probe.startsWith('body.')) return !!doc.body?.classList.contains(probe.slice(5));
+	if (probe.startsWith('.')) return doc.getElementsByClassName(probe.slice(1)).length > 0;
+	return !!doc.querySelector(probe);
+}
+
+/** Active ou coupe les sections selon ce que la fenêtre affiche (appelé régulièrement, sondes bon marché). */
+export function refreshCssSections(doc: Document | null | undefined) {
+	if (!doc?.head) return;
+	for (const el of doc.head.querySelectorAll<HTMLStyleElement>('style[data-sp-probe]')) {
+		const on = probeMatches(doc, el.dataset.spProbe || '');
+		if (el.sheet && el.sheet.disabled === on) el.sheet.disabled = !on;
+	}
+}
+
 /** Injecte (ou met à jour) la feuille de style dans un document Steam. */
-export function applyCss(doc: Document, css: string) {
+export function applyCss(doc: Document, full: string) {
 	if (!doc?.head) return;
 	let el = doc.getElementById('sp-theme') as HTMLStyleElement | null;
 	if (!el) {
@@ -741,5 +795,24 @@ export function applyCss(doc: Document, css: string) {
 		font.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap';
 		doc.head.appendChild(font);
 	}
+	const sections: { id: string; probe: string; css: string }[] = [];
+	const css = full.replace(SECTION, (_m, id: string, probe: string, body: string) => {
+		sections.push({ id, probe: probe.trim(), css: body });
+		return '';
+	});
 	if (el.textContent !== css) el.textContent = css;
+	// Sections juste après la feuille principale (même ordre de priorité qu'avant, à peu de chose près)
+	let after: Element = el;
+	for (const s of sections) {
+		let st = doc.getElementById(`sp-theme-${s.id}`) as HTMLStyleElement | null;
+		if (!st) {
+			st = doc.createElement('style');
+			st.id = `sp-theme-${s.id}`;
+		}
+		if (after.nextElementSibling !== st) after.insertAdjacentElement('afterend', st);
+		st.dataset.spProbe = s.probe;
+		if (st.textContent !== s.css) st.textContent = s.css;
+		after = st;
+	}
+	refreshCssSections(doc);
 }

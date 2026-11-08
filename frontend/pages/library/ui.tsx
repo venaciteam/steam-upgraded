@@ -1,6 +1,7 @@
 // Petits composants de la page Bibliothèque : icônes, avatar, bouton Jouer.
 import { useState } from 'react';
 import { PlayControl } from '../game/PlayControl';
+import { appById } from '../../core/steam';
 import type { Game, Person } from './data';
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -81,5 +82,6 @@ export function Dot({ color, size = 8 }: { color: string; size?: number }) {
 
 /** Bouton Jouer / Installer / Streamer (core/machines.ts), avec la flèche des autres machines s'il y en a. */
 export function PlayButton({ g, compact, style }: { g: Game; compact?: boolean; style?: any }) {
-	return <PlayControl app={g.app} name={g.name} compact={compact} style={style} />;
+	// Objet actuel de Steam (l'instantané de la bibliothèque peut garder une version d'avant la fin d'un téléchargement)
+	return <PlayControl app={appById(g.appid) || g.app} name={g.name} compact={compact} style={style} />;
 }

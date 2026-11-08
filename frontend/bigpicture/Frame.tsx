@@ -271,7 +271,15 @@ export function Header({ tab }: { tab: Tab }) {
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
 						<path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
 					</svg>
-					<span style={{ color: 'var(--sp-text)' }}>{dl.paused ? 'En pause' : `${dl.pct} %`}</span>
+					<span style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+						<span style={{ display: 'flex', gap: 10, minWidth: 0, color: 'var(--sp-text)' }}>
+							<span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dl.name || 'Téléchargement'}</span>
+							<span style={{ flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{dl.paused ? 'En pause' : `${dl.pct} %`}</span>
+						</span>
+						<span aria-hidden="true" style={{ display: 'block', height: 4, borderRadius: 2, background: 'var(--sp-line)', overflow: 'hidden' }}>
+							<i style={{ display: 'block', height: '100%', width: `${dl.pct}%`, background: 'var(--sp-accent)', transition: 'width .6s ease' }} />
+						</span>
+					</span>
 				</span>
 			)}
 			<NowPlayingPill />

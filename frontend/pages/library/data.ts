@@ -1,7 +1,7 @@
 // Données de la page Bibliothèque : instantané figé des objets MobX de Steam,
 // relu au montage, au retour sur la fenêtre et toutes les 30 s (sans re-rendu si rien n'a changé).
 import { useCallback, useEffect, useState } from 'react';
-import { installedHere } from '../../core/machines';
+import { installedHere, statusKey } from '../../core/machines';
 import { artStamp, onArtChanged } from '../../core/art';
 import {
 	allApps,
@@ -29,6 +29,8 @@ export type Game = {
 	last: number;
 	purchased: number;
 	installed: boolean;
+	/** États de Steam (téléchargement, lancement…) : le bouton Jouer se redessine quand ils changent. */
+	status: string;
 	lender: Lender | null;
 	/** Nombre de copies dans la Famille Steam (1 si une seule). */
 	copies: number;
@@ -86,6 +88,7 @@ function readLibrary(): Library {
 			last: app.rt_last_time_played || 0,
 			purchased: app.rt_purchased_time || 0,
 			installed: installedHere(app),
+			status: statusKey(app),
 			lender,
 			copies: Math.max(1, Number(app.number_of_copies) || 1),
 			art: artStamp(app),
@@ -93,7 +96,7 @@ function readLibrary(): Library {
 			landscape: landscapeUrl(app),
 			app,
 		};
-		sigParts.push(`${g.appid}:${g.mins}:${g.mins2w}:${g.last}:${g.installed ? 1 : 0}:${g.cover}:${g.landscape}:${lender?.name || ''}:${g.copies}:${g.art}`);
+		sigParts.push(`${g.appid}:${g.mins}:${g.mins2w}:${g.last}:${g.installed ? 1 : 0}:${g.status}:${g.cover}:${g.landscape}:${lender?.name || ''}:${g.copies}:${g.art}`);
 		return g;
 	};
 	for (const app of allApps()) {
@@ -159,14 +162,21 @@ export function useLibrary(): [Library, () => void] {
 		// Les magasins Steam peuvent finir de se remplir juste après le montage
 		const t0 = setTimeout(refresh, 1500);
 		// Après un changement de mode (bureau, Big Picture), Steam remplit sa liste peu à peu, sans que la fenêtre
-		// du bureau reprenne le focus en Big Picture : contrôle léger (nombre de jeux et d'installés), relecture si besoin.
-		let quick = -1;
+		// du bureau reprenne le focus en Big Picture ; et un téléchargement qui se termine change l'état d'un jeu
+		// (« Téléchargement… » devient « Jouer ») : contrôle léger (nombre de jeux, installés, états), relecture si besoin.
+		let quick = '';
 		const tq = setInterval(() => {
 			const apps = allApps();
-			let k = apps.length * 10000;
-			for (const a of apps) if (installedHere(a)) k++;
-			if (quick >= 0 && k !== quick) refresh();
-			quick = k;
+			let installed = 0;
+			let h = 0;
+			for (const a of apps) {
+				if (installedHere(a)) installed++;
+				const k = statusKey(a);
+				for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) | 0;
+			}
+			const key = `${apps.length}:${installed}:${h}`;
+			if (quick && key !== quick) refresh();
+			quick = key;
 		}, 2000);
 		return () => {
 			clearInterval(t);

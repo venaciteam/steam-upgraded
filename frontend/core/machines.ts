@@ -66,6 +66,17 @@ export function machinesOf(app: any): { here: Machine | null; others: Machine[];
 	return { here: here && here.available ? here : null, others: all.filter((m) => !m.local), known: true };
 }
 
+/**
+ * États affichés par Steam (lancement, téléchargement, mise à jour…) sur chaque machine du compte, en une clé courte :
+ * elle change dès que le bouton Jouer d'un jeu doit changer.
+ */
+export function statusKey(app: any): string {
+	const list: any[] = Array.isArray(app?.per_client_data) ? app.per_client_data : [];
+	let k = String(app?.display_status ?? 0);
+	for (const c of list) k += `.${c?.display_status ?? 0}`;
+	return k;
+}
+
 /** Installé sur l'ordinateur devant soi (pas sur une autre machine du compte). */
 export function installedHere(app: any): boolean {
 	const m = machinesOf(app);
@@ -141,4 +152,31 @@ export function gameActions(app: any): { primary: GameAction; choices: GameActio
 export function runPrimary(app: any) {
 	const { primary } = gameActions(app);
 	if (!primary.disabled) primary.run();
+}
+
+// ---------- Taille du jeu ----------
+
+/** Taille lisible (« 3,4 Go », « 820 Mo »), en unités binaires comme Steam ; vide si inconnue. */
+export function sizeLabel(bytes: number): string {
+	if (!(bytes > 0)) return '';
+	const go = bytes / 1024 ** 3;
+	if (go >= 1) return `${go.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
+	const mo = bytes / 1024 ** 2;
+	return mo >= 1 ? `${Math.round(mo)} Mo` : `${Math.max(1, Math.round(bytes / 1024))} ko`;
+}
+
+/**
+ * Taille d'un jeu sur l'ordinateur devant soi : espace occupé s'il est installé (celui qu'affiche Steam), sinon espace
+ * nécessaire pour l'installer. Les deux viennent des détails du jeu (`appDetailsStore`), chargés par
+ * `RegisterForAppData` ; la vue d'ensemble ne donne que la taille d'un jeu installé (`size_on_disk`).
+ * Jeu non installé : `lDiskSpaceRequiredBytes` compte aussi les contenus additionnels possédés, installés avec le jeu ;
+ * leur part est dans `lDlcUsageBytes` (`dlc`). Elle peut être énorme (NieR:Automata, novembre 2026 : 366 Go dont 326 de
+ * contenus, chiffre réel chez tout le monde), d'où son affichage à part sur la fiche.
+ */
+export function gameSize(app: any, details?: any): { bytes: number; dlc: number; installed: boolean } {
+	const installed = installedHere(app);
+	const d = details ?? w.appDetailsStore?.GetAppDetails?.(app?.appid);
+	const bytes = installed ? Number(d?.lDiskUsageBytes || app?.size_on_disk || 0) : Number(d?.lDiskSpaceRequiredBytes || 0);
+	const dlc = Number(d?.lDlcUsageBytes || 0);
+	return { bytes, dlc: dlc > 0 && dlc < bytes ? dlc : 0, installed };
 }

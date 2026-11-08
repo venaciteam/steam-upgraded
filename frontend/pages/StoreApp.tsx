@@ -8,11 +8,12 @@ import { useSettings } from '../core/settings';
 import { avatarUrl, mainWindow, myAccountId, navigate, openSteamWeb, ROUTES } from '../core/steam';
 import { usePageTransition } from '../core/transitions';
 import { playDash } from '../bigpicture/dash';
-import { capitalize, FRENCH, int, loadStoreApp, loadWishlist, money, mySteamId, ownershipMap, pegiColor, playFeatures, promoEndWhen, reviewTone, setWishlisted, storeUrl, useAsync } from './store/data';
+import { capitalize, FRENCH, int, storeDiskLabel, loadStoreApp, loadWishlist, money, mySteamId, ownershipMap, pegiColor, playFeatures, promoEndWhen, reviewTone, setWishlisted, storeUrl, useAsync } from './store/data';
 import type { StoreApp } from './store/data';
 import { FallbackImg } from './Game';
 import { FriendsCard } from './game/cards';
 import { useFriendsWithGame } from './game/data';
+import { NewsSection } from './game/NewsSection';
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
@@ -89,6 +90,8 @@ function BuyPanel({ app, wished, busy, onWish }: { app: StoreApp; wished: boolea
 			? { label: 'Voir sur Steam', run: web }
 			: { label: app.free ? 'Obtenir sur Steam' : 'Acheter sur Steam', run: web };
 	const familyAvatar = family ? avatarUrl(family.accountId) : mine ? avatarUrl(myAccountId()) : undefined;
+	// Espace disque de la configuration requise du magasin
+	const disk = storeDiskLabel(app);
 
 	return (
 		<div className="spv-panel">
@@ -147,6 +150,17 @@ function BuyPanel({ app, wished, busy, onWish }: { app: StoreApp; wished: boolea
 				)}
 				<span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{family ? `Jouable via ${family.name}` : mine ? 'Déjà à vous' : 'Personne dans la famille ne l’a encore'}</span>
 			</span>
+			{disk && (
+				<span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+					<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...svg} style={{ flex: 'none', color: 'var(--sp-muted)' }}>
+						<ellipse cx="12" cy="6" rx="8" ry="3" />
+						<path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+					</svg>
+					<span>
+						<b>{disk}</b> <span className="sp-muted">d’espace disque nécessaire</span>
+					</span>
+				</span>
+			)}
 			{!mine && <span className="sp-muted" style={{ fontSize: 12 }}>Le paiement se fait sur la page de Steam : rien n’est acheté depuis cette page.</span>}
 		</div>
 	);
@@ -385,6 +399,8 @@ export function StoreAppPage(props: any) {
 						)}
 					</aside>
 				</div>
+				{/* Historique des mises à jour et actualités du jeu (comme sur la fiche) */}
+				<NewsSection appid={appid} />
 			</div>
 
 			{viewer !== null && (

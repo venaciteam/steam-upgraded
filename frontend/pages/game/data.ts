@@ -1,6 +1,6 @@
 // Données de la fiche d'un jeu : détails Steam, succès, famille, amis, relevés de temps de jeu.
 import { pluginConfig } from 'millennium';
-import { ActionKind, GameAction, gameActions } from '../../core/machines';
+import { ActionKind, GameAction, gameActions, gameSize, sizeLabel } from '../../core/machines';
 import { useEffect, useState } from 'react';
 import { appById, avatarUrl, familyMembers, myAccountId, playerName } from '../../core/steam';
 import { currentPath, usePath } from '../../core/history';
@@ -71,9 +71,36 @@ export function useGame(appid: number): { app: any; details: any; tick: number }
 	return { app, details, tick };
 }
 
+// ---------- Taille du jeu ----------
+
+/**
+ * Taille lisible d'un jeu (espace occupé, ou nécessaire s'il n'est pas installé : core/machines.ts). Les détails d'un
+ * jeu non installé ne sont chargés par Steam qu'à la demande : on les demande le temps que le composant existe
+ * (carte de survol au bureau, tuile focalisée en Big Picture), jamais pour toute la bibliothèque.
+ */
+export function useGameSize(app: any): { size: string; installed: boolean } {
+	const [, setTick] = useState(0);
+	const appid = Number(app?.appid || 0);
+	const { bytes, installed } = gameSize(app);
+	useEffect(() => {
+		if (!appid || bytes > 0 || isShortcut(appid)) return undefined;
+		let reg: any = null;
+		try {
+			reg = w.appDetailsStore?.RegisterForAppData?.(appid, () => setTick((t) => t + 1));
+		} catch {}
+		return () => {
+			try {
+				reg?.unregister?.();
+			} catch {}
+		};
+	}, [appid, bytes > 0]);
+	return { size: sizeLabel(bytes), installed };
+}
+
 // ---------- Bouton principal ----------
 
-export type PrimaryState = { label: string; disabled: boolean; hint?: string; kind: ActionKind; choices: GameAction[] };
+/** `downloading` : téléchargement ou mise à jour en cours sur cet ordinateur (le bouton du bureau mène aux téléchargements). */
+export type PrimaryState = { label: string; disabled: boolean; hint?: string; kind: ActionKind; choices: GameAction[]; downloading?: boolean };
 
 const UPDATE_STATES = new Set([18, 19, 20, 21, 39]);
 
@@ -91,8 +118,8 @@ export function primaryState(app: any): PrimaryState {
 	if (ds === 37) return { ...base, label: 'Copie utilisée', disabled: true, hint: 'Le propriétaire joue en ce moment' };
 	if (ds === 17) return { ...base, label: 'Copie utilisée', disabled: true, hint: 'Un autre membre de la famille joue sur cette copie' };
 	if (primary.kind === 'play' || primary.kind === 'install' || primary.kind === 'remote-install') {
-		if (ds === 3 || ds === 7 || ds === 23 || ds === 22) return { ...base, label: 'Téléchargement…', disabled: true, hint: 'Suivi dans les téléchargements' };
-		if (ds === 6) return { ...base, label: 'Mise à jour…', disabled: true, hint: 'Suivi dans les téléchargements' };
+		if (ds === 3 || ds === 7 || ds === 23 || ds === 22) return { ...base, label: 'Téléchargement…', disabled: true, downloading: true, hint: 'Voir dans les téléchargements' };
+		if (ds === 6) return { ...base, label: 'Mise à jour…', disabled: true, downloading: true, hint: 'Voir dans les téléchargements' };
 		if (primary.kind === 'play' && UPDATE_STATES.has(ds)) return { ...base, label: 'Mettre à jour', disabled: false };
 	}
 	if (primary.kind === 'unavailable') return { ...base, label: primary.label, disabled: true, hint: 'Ce jeu n’existe pas pour ce système' };

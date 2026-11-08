@@ -5,6 +5,7 @@ import { memo, useMemo, useState } from 'react';
 import { DialogButton, Focusable } from 'millennium';
 import { formatLastPlayed, myAccountId } from '../core/steam';
 import { formatBigHours, keyOf, plural, sortGames, SORTS, useLibrary, viewTest, VIEWS } from '../pages/library/data';
+import { useGameSize } from '../pages/game/data';
 import type { Game, Library, SortId, ViewId } from '../pages/library/data';
 import { BpFrame, goBackBp, MemberAvatar } from './Frame';
 import { Cover, openGame, openGameOptions } from './gameActions';
@@ -38,7 +39,15 @@ const AlbumTile = memo(function AlbumTile({ g, focus }: { g: Game; focus: boolea
 	);
 });
 
+/** Taille du jeu sous la jaquette focalisée (montée au premier focus seulement : voir useGameSize). */
+function SizeLine({ app }: { app: any }) {
+	const { size, installed } = useGameSize(app);
+	if (!size) return null;
+	return <span className="spbp-tile-more-sub">{installed ? `${size} sur le disque` : `${size} à installer`}</span>;
+}
+
 const Tile = memo(function Tile({ g, focus }: { g: Game; focus: boolean }) {
+	const [seen, setSeen] = useState(false);
 	const owner = g.lender ? keyOf(g.lender.name) : 'Votre copie';
 	const copies = g.copies > 1 ? ` · ${plural(g.copies, 'copie', 'copies')}` : '';
 	return (
@@ -48,9 +57,12 @@ const Tile = memo(function Tile({ g, focus }: { g: Game; focus: boolean }) {
 			autoFocus={focus}
 			aria-label={g.name}
 			// infos ajoutées sous la jaquette au focus (défilement : voir revealFocused dans Frame.tsx)
-			data-reveal-extra={160}
+			data-reveal-extra={196}
 			onClick={() => openGame(g.appid)}
-			onGamepadFocus={() => (lastFocus = g.appid)}
+			onGamepadFocus={() => {
+				lastFocus = g.appid;
+				setSeen(true);
+			}}
 			onOKActionDescription="Fiche du jeu"
 			onSecondaryButton={(e: any) => openGameOptions(g.app, e?.currentTarget)}
 			onSecondaryActionDescription="Options du jeu"
@@ -70,6 +82,7 @@ const Tile = memo(function Tile({ g, focus }: { g: Game; focus: boolean }) {
 						{owner}
 						{copies}
 					</span>
+					{seen && <SizeLine app={g.app} />}
 					<span className="spbp-tile-play">
 						<Glyph button={GLYPH.A} size={30} fallback="A" />
 						Fiche du jeu

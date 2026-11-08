@@ -6,6 +6,19 @@ import { useCart } from '../pages/store/cart';
 import { IconCart, IconHeart } from '../pages/store/ui';
 import { bpNavigate, ROUTES } from '../core/steam';
 
+/** Recherche (jeux du magasin, de la bibliothèque, contacts) : l'écran Recherche de Big Picture. */
+export function BpStoreSearchLink() {
+	return (
+		<DialogButton className="spbp-storelink" noFocusRing onClick={() => bpNavigate(ROUTES.bpSearch)} onOKActionDescription="Rechercher">
+			<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+				<circle cx="11" cy="11" r="6.5" />
+				<path d="M20 20l-4.2-4.2" />
+			</svg>
+			<span style={{ flex: 1 }}>Rechercher</span>
+		</DialogButton>
+	);
+}
+
 export function BpStoreLink({ to, autoFocus }: { to: 'wishlist' | 'cart'; autoFocus?: boolean }) {
 	const [wl] = useAsync((force) => loadWishlist(mySteamId(), force), []);
 	const { cart } = useCart();
