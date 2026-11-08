@@ -7,12 +7,15 @@ import {
 	Achievements,
 	collectionsOf,
 	Copy,
+	copyUse,
+	CopyUse,
 	dayToDate,
 	formatDate,
 	formatDuration,
 	Friend,
 	liveName,
 	monthlyFromLog,
+	namesList,
 	Reading,
 	setPreferredCopy,
 } from './data';
@@ -184,7 +187,7 @@ function deName(name: string): string {
 }
 
 /** Toutes les copies du jeu dans la famille, la copie utilisée marquée, et le choix d'une autre copie. */
-function CopiesChooser({ app, copies, onChanged }: { app: any; copies: Copy[]; onChanged: () => void }) {
+function CopiesChooser({ app, copies, use, onChanged }: { app: any; copies: Copy[]; use: CopyUse; onChanged: () => void }) {
 	const [pending, setPending] = useState<number | null>(null);
 	const [error, setError] = useState('');
 	const ds = Number(app.display_status ?? 0);
@@ -213,13 +216,23 @@ function CopiesChooser({ app, copies, onChanged }: { app: any; copies: Copy[]; o
 			{sorted.map((c) => {
 				const who = liveName(c.accountId, c.name);
 				const name = c.isMe ? 'Votre copie' : `Copie ${deName(who)}`;
+				const on = use.onCopy.get(c.accountId) || [];
+				const inUse = on.length ? `${on.length === 1 && on[0] === c.accountId ? who : namesList(on)} y joue` + (on.length > 1 ? 'nt' : '') : '';
 				return (
 					<div
 						key={c.accountId}
 						style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40, padding: '4px 6px 4px 6px', borderRadius: 'var(--sp-r-sm)', background: c.preferred ? 'var(--sp-surface2)' : 'transparent' }}
 					>
 						<Initial name={c.isMe ? 'T' : who} color={c.isMe ? 'var(--sp-accent)' : c.color} size={26} accountId={c.accountId} />
-						<span title={name} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: c.preferred ? 700 : 500, fontSize: 14 }}>{name}</span>
+						<span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+							<span title={name} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: c.preferred ? 700 : 500, fontSize: 14 }}>{name}</span>
+							{inUse && (
+								<span title={inUse} style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--sp-online)' }}>
+									<span aria-hidden="true" style={{ flex: 'none', width: 6, height: 6, borderRadius: '50%', background: 'var(--sp-online)' }} />
+									<span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{inUse}</span>
+								</span>
+							)}
+						</span>
 						{c.preferred ? (
 							<span className="sp-badge" style={{ flex: 'none' }}>
 								Utilisée
@@ -254,13 +267,38 @@ function CopiesChooser({ app, copies, onChanged }: { app: any; copies: Copy[]; o
 	);
 }
 
+/**
+ * Membres en jeu que les lignes des copies ne montrent pas : `mine` (une seule copie, la vôtre), puis ceux dont la
+ * copie est inconnue, puis ceux qu'on ne sait pas nommer.
+ */
+function playingLine(mine: number[], use: CopyUse): string {
+	const parts: string[] = [];
+	if (mine.length) parts.push(`${namesList(mine)} ${mine.length > 1 ? 'y jouent' : 'y joue'} sur votre copie en ce moment.`);
+	if (use.elsewhere.length) parts.push(`${namesList(use.elsewhere)} ${use.elsewhere.length > 1 ? 'y jouent' : 'y joue'} en ce moment.`);
+	if (use.unknown) {
+		const named = parts.length > 0;
+		parts.push(
+			use.unknown === 1
+				? named ? 'Un autre membre de la famille aussi.' : 'Un membre de la famille y joue en ce moment.'
+				: named ? `${use.unknown} autres membres de la famille aussi.` : `${use.unknown} membres de la famille y jouent en ce moment.`,
+		);
+	}
+	return parts.join(' ');
+}
+
 export function KeyCard({ app, details, lender, copies, onCopiesChanged }: { app: any; details: any; lender: Member | null; copies: Copy[] | null; onCopiesChanged: () => void }) {
 	const several = !!copies && copies.length > 1;
-	const playing = Number(details?.unMembersPlaying || 0);
 	const ds = Number(app.display_status ?? 0);
+	const use = copyUse(app.appid, details, copies);
 
 	if (lender) {
 		const busy = ds === 37 || ds === 17;
+		const lenderUsers = use.onCopy.get(lender.accountId) || [];
+		const busyText = lenderUsers.length
+			? lenderUsers.length === 1 && lenderUsers[0] === lender.accountId
+				? `${lender.name} y joue en ce moment.`
+				: `${namesList(lenderUsers)} ${lenderUsers.length > 1 ? 'l’utilisent' : 'l’utilise'} en ce moment.`
+			: 'Cette copie est utilisée en ce moment.';
 		return (
 			<section className="sp-card" style={{ ...sideCard, border: `2px solid ${lender.color}` }} aria-labelledby="sp-game-key">
 				<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -276,12 +314,12 @@ export function KeyCard({ app, details, lender, copies, onCopiesChanged }: { app
 				</div>
 				<ul className="sp-muted" style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
 					<li style={{ color: busy ? 'var(--sp-text)' : undefined, fontWeight: busy ? 700 : undefined }}>
-						{busy ? 'Cette copie est utilisée en ce moment.' : 'Libre en ce moment : vous pouvez jouer.'}
+						{busy || lenderUsers.length ? busyText : 'Libre en ce moment : vous pouvez jouer.'}
 					</li>
 					<li>Une copie ne sert qu'à une personne à la fois : si {lender.name} lance le jeu, votre partie devra s'arrêter.</li>
 					<li>Vos sauvegardes, vos succès et votre temps de jeu vous restent.</li>
 				</ul>
-				{several && <CopiesChooser app={app} copies={copies!} onChanged={onCopiesChanged} />}
+				{several && <CopiesChooser app={app} copies={copies!} use={use} onChanged={onCopiesChanged} />}
 				<button
 					type="button"
 					onClick={() => openStorePage(app.appid)}
@@ -304,10 +342,10 @@ export function KeyCard({ app, details, lender, copies, onCopiesChanged }: { app
 					? "Ce jeu ne peut pas être prêté à la Famille Steam."
 					: "Votre famille peut l'emprunter quand vous n'y jouez pas : une seule personne à la fois sur votre copie."}
 			</span>
-			{several && <CopiesChooser app={app} copies={copies!} onChanged={onCopiesChanged} />}
-			{playing > 0 && (
+			{several && <CopiesChooser app={app} copies={copies!} use={use} onChanged={onCopiesChanged} />}
+			{playingLine(several ? [] : [...use.onCopy.values()].flat(), use) && (
 				<span className="sp-muted" style={{ fontSize: 13 }}>
-					{playing === 1 ? 'Un membre de la famille y joue en ce moment.' : `${playing} membres de la famille y jouent en ce moment.`}
+					{playingLine(several ? [] : [...use.onCopy.values()].flat(), use)}
 				</span>
 			)}
 		</section>

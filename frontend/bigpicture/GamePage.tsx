@@ -7,7 +7,8 @@ import { avatarUrl, bpNavigate, formatLastPlayed, playOrInstall, ROUTES } from '
 import { useSettings } from '../core/settings';
 import { usePath } from '../core/history';
 import { formatBigHours, forgetOwners, keyOf, plural } from '../pages/library/data';
-import { isShortcut, primaryState, setPreferredCopy, useAchievements, useFriendsWithGame, useGame, useLenders } from '../pages/game/data';
+import { copyUse, isShortcut, namesList, primaryState, setPreferredCopy, useAchievements, useFriendsWithGame, useGame, useLenders } from '../pages/game/data';
+import type { CopyUse } from '../pages/game/data';
 import { BpNews } from './News';
 import type { Copy } from '../pages/game/data';
 import { BpFrame, goBackBp, MemberAvatar } from './Frame';
@@ -31,7 +32,13 @@ function copyName(c: Copy): string {
 
 /** Choix de la copie utilisée (menu manette natif). La copie actuelle vient en premier, là où arrive le focus :
  * un appui réflexe sur A ne change rien. */
-function chooseCopy(appid: number, copies: Copy[], onChanged: () => void) {
+/** « Alex y joue » pour une copie, « » si personne (ce compte excepté). */
+function playersOn(c: Copy, use: CopyUse): string {
+	const on = use.onCopy.get(c.accountId) || [];
+	return on.length ? `${namesList(on)} ${on.length > 1 ? 'y jouent' : 'y joue'}` : '';
+}
+
+function chooseCopy(appid: number, copies: Copy[], use: CopyUse, onChanged: () => void) {
 	const ordered = [...copies].sort((a, b) => Number(b.preferred) - Number(a.preferred) || Number(b.isMe) - Number(a.isMe) || a.name.localeCompare(b.name, 'fr'));
 	showBpMenu(
 		<Menu label="Copie à utiliser">
@@ -49,6 +56,7 @@ function chooseCopy(appid: number, copies: Copy[], onChanged: () => void) {
 				>
 					{copyName(c)}
 					{c.preferred ? ' · utilisée' : ''}
+					{playersOn(c, use) ? ` · ${playersOn(c, use)}` : ''}
 				</MenuItem>
 			))}
 		</Menu>,
@@ -99,6 +107,17 @@ export function BpGame() {
 	const st = primaryState(app);
 	const several = !!copies && copies.length > 1;
 	const used = copies?.find((c) => c.preferred) || copies?.find((c) => c.isMe) || copies?.[0];
+	const use = copyUse(appid, details, copies);
+	// Qui joue : d'abord sur la copie utilisée, sinon sur une autre copie de la famille
+	const usedBy = used ? playersOn(used, use) : '';
+	const other = copies?.find((c) => c !== used && use.onCopy.has(c.accountId));
+	const playingNote = usedBy
+		? `${usedBy} sur cette copie`
+		: other
+			? `${playersOn(other, use)} sur ${other.isMe ? 'votre copie' : `la ${keyOf(other.name).replace(/^Clé/, 'copie')}`}`
+			: use.elsewhere.length
+				? `${namesList(use.elsewhere)} ${use.elsewhere.length > 1 ? 'y jouent' : 'y joue'}`
+				: '';
 	const { bytes, installed } = gameSize(app, details);
 	const size = sizeLabel(bytes);
 	// Taille bien visible (en gras), avant comme après l'installation
@@ -119,7 +138,7 @@ export function BpGame() {
 	const fade = oled
 		? 'linear-gradient(to right, rgba(0,0,0,.72) 0%, rgba(0,0,0,0) 65%)'
 		: 'linear-gradient(to bottom, transparent 45%, var(--sp-bg) 100%), linear-gradient(to right, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 60%)';
-	const changeCopy = several ? () => chooseCopy(appid, copies!, () => setVersion((v) => v + 1)) : undefined;
+	const changeCopy = several ? () => chooseCopy(appid, copies!, use, () => setVersion((v) => v + 1)) : undefined;
 
 	return (
 		<BpFrame
@@ -191,6 +210,7 @@ export function BpGame() {
 							<span style={{ display: 'flex', flexDirection: 'column' }}>
 								<span style={{ fontSize: 24, fontWeight: 800 }}>{copyName(used)}</span>
 								<span style={{ fontSize: 17, color: 'var(--sp-muted)' }}>{several ? `${plural(copies!.length - 1, 'autre', 'autres')} dans la famille` : 'Seule copie'}</span>
+								{playingNote && <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--sp-online)' }}>{playingNote}</span>}
 							</span>
 						</span>
 					) : (
