@@ -1,6 +1,6 @@
 // Big Picture › Accueil : « Reprendre » en grand, joués récemment, promos de la liste de souhaits.
 import { DialogButton, Focusable } from 'millennium';
-import { bpNavigate, formatLastPlayed, playOrInstall } from '../core/steam';
+import { bpNavigate, formatLastPlayed, playOrInstall, ROUTES } from '../core/steam';
 import { formatBigHours, plural, useLibrary } from '../pages/library/data';
 import type { Game } from '../pages/library/data';
 import { loadWishlist, mySteamId, useAsync } from '../pages/store/data';
@@ -32,9 +32,9 @@ function Resume({ g }: { g: Game }) {
 						className="spbp-btn spbp-btn--primary"
 						noFocusRing
 						autoFocus
-						disabled={st.disabled}
-						onClick={() => playOrInstall(g.app)}
-						onOKActionDescription={st.label}
+						disabled={st.disabled && !st.downloading}
+						onClick={() => (st.downloading ? bpNavigate(ROUTES.bpDownloads) : playOrInstall(g.app))}
+						onOKActionDescription={st.downloading ? 'Voir les téléchargements' : st.label}
 						onSecondaryButton={(e: any) => openGameOptions(g.app, e?.currentTarget)}
 						onSecondaryActionDescription="Options"
 					>

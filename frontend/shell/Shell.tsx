@@ -1,6 +1,6 @@
 // Composant global : applique le thème et place la navigation et le bouton de compte dans la barre de titre de Steam.
 import { useEffect, useState } from 'react';
-import { applyCss, buildCss } from '../core/theme';
+import { applyCss, buildCss, refreshCssSections } from '../core/theme';
 import { useSettings, getSettings, onSettings } from '../core/settings';
 import { mainWindow } from '../core/steam';
 import { AccountButton, NavBar } from './TopNav';
@@ -28,6 +28,15 @@ export function initThemeEverywhere() {
 	};
 	paint();
 	onSettings(paint);
+	// Sections de la feuille propres à certains écrans natifs (dialogues, liste réduite) : activées dès que leur cible
+	// apparaît dans une fenêtre (sondes par classe, quasi gratuites), voir refreshCssSections dans core/theme.ts.
+	setInterval(() => {
+		for (const p of w.g_PopupManager?.GetPopups?.() || []) {
+			try {
+				refreshCssSections(p.window?.document);
+			} catch {}
+		}
+	}, 120);
 	w.g_PopupManager?.AddPopupCreatedCallback?.((p: any) => {
 		setTimeout(() => {
 			try {

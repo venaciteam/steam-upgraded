@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { GameAction, gameActions } from '../../core/machines';
 import { primaryState } from './data';
+import { navigate, ROUTES } from '../../core/steam';
 
 const w = window as any;
 
@@ -83,7 +84,7 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 	const fill = flex !== undefined || width !== undefined;
 	const h = btn.height ?? (big ? undefined : compact ? 36 : 40);
 	// Fiche du jeu : toujours le bouton plein ; cartes : plein pour jouer ou streamer, discret pour installer
-	const primaryLook = big || st.kind === 'play' || st.kind === 'stream';
+	const primaryLook = big || (!st.downloading && (st.kind === 'play' || st.kind === 'stream'));
 	const cls = `sp-btn${primaryLook ? ' sp-btn--primary' : ''}${big ? ' sp-btn--big' : ''}`;
 	const iconSize = big ? 18 : compact ? 14 : 15;
 	const body = arrow.current?.ownerDocument?.body;
@@ -93,6 +94,8 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 	const tight = !!compact && fill;
 	const short = !compact
 		? st.label
+		: st.downloading && tight
+			? 'En cours'
 		: st.kind === 'stream'
 			? 'Streamer'
 			: st.kind === 'remote-install'
@@ -107,10 +110,11 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 				ref={main}
 				type="button"
 				className={cls}
-				disabled={st.disabled}
+				// Téléchargement en cours : le bouton reste cliquable et ouvre la page des téléchargements
+				disabled={st.disabled && !st.downloading}
 				title={st.hint || (short !== st.label ? st.label : undefined)}
-				aria-label={name ? label : short !== st.label ? st.label : undefined}
-				onClick={() => !st.disabled && gameActions(app).primary.run()}
+				aria-label={st.downloading ? `${label}, voir dans les téléchargements` : name ? label : short !== st.label ? st.label : undefined}
+				onClick={() => (st.downloading ? navigate(ROUTES.downloads) : !st.disabled && gameActions(app).primary.run())}
 				style={{
 					height: h,
 					padding: big ? undefined : compact ? '0 14px' : '0 18px',
@@ -118,10 +122,10 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 					...btn,
 					...(fill ? { flex: '1 1 auto', minWidth: 0 } : {}),
 					...(choice ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : {}),
-					...(st.disabled ? { opacity: 0.6, cursor: 'default' } : {}),
+					...(st.disabled && !st.downloading ? { opacity: 0.6, cursor: 'default' } : {}),
 				}}
 			>
-				{!tight && <Glyph kind={st.kind} size={iconSize} />}
+				{(!tight || st.downloading) && <Glyph kind={st.downloading ? 'install' : st.kind} size={iconSize} />}
 				<span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{short}</span>
 			</button>
 			{choice && (

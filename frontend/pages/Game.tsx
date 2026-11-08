@@ -1,7 +1,7 @@
 // Fiche d'un jeu : /steamupgraded/app/:appid
 import { useEffect, useState } from 'react';
 import { PlayControl } from './game/PlayControl';
-import { installedHere } from '../core/machines';
+import { gameSize, hereLabel, sizeLabel } from '../core/machines';
 import type { CSSProperties } from 'react';
 import { heroUrl, lenderOf, logoUrl, openProperties, openStorePage } from '../core/steam';
 import { useSettings } from '../core/settings';
@@ -9,6 +9,7 @@ import { useArt } from '../core/art';
 import { openArtworkDialog } from '../features/sgdb';
 import { heroCandidates, isShortcut, liveName, logoCandidates, useAchievements, useFriendsWithGame, useGame, useLenders, usePlaytimeLog, useRouteAppId } from './game/data';
 import { CollectionsCard, FriendsCard, KeyCard, PlaytimeCard, ProgressCard } from './game/cards';
+import { NewsSection } from './game/NewsSection';
 import { usePageTransition } from '../core/transitions';
 
 const icon = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
@@ -34,6 +35,12 @@ const Icons = {
 		<svg {...icon}>
 			<path d="M4 7h16l-1.5 12.5a1.5 1.5 0 0 1-1.5 1.5H7a1.5 1.5 0 0 1-1.5-1.5z" />
 			<path d="M9 10V6a3 3 0 0 1 6 0v4" />
+		</svg>
+	),
+	disk: (
+		<svg {...icon}>
+			<ellipse cx="12" cy="6" rx="8" ry="3" />
+			<path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
 		</svg>
 	),
 	image: (
@@ -127,8 +134,12 @@ function Hero({ app, oled }: { app: any; oled: boolean }) {
 
 function ActionBar({ app, details }: { app: any; details: any }) {
 	const shortcut = isShortcut(app.appid);
-	const size = Number(details?.lDiskUsageBytes || app.size_on_disk || 0);
-	const status = installedHere(app) ? `Installé${size ? ` · ${(size / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go` : ''}` : 'Non installé';
+	// Taille bien visible, avant comme après l'installation (espace nécessaire, puis espace occupé)
+	const { bytes, dlc, installed } = gameSize(app, details);
+	const size = sizeLabel(bytes);
+	// Part des contenus additionnels, quand elle compte (plus d'un dixième)
+	const extra = dlc > bytes / 10 ? ` (dont ${sizeLabel(dlc)} de contenus additionnels)` : '';
+	const status = installed ? `Installé sur ${hereLabel()}` : size ? `Espace nécessaire pour l’installer${extra}` : 'Non installé';
 	return (
 		<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '20px 40px 0' }}>
 			<PlayControl app={app} big />
@@ -142,8 +153,16 @@ function ActionBar({ app, details }: { app: any; details: any }) {
 					Page du magasin
 				</button>
 			)}
-			<span className="sp-muted" style={{ marginLeft: 'auto', fontSize: 13 }}>
-				{status}
+			<span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+				{size && (
+					<span aria-hidden="true" style={{ width: 38, height: 38, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--sp-r-sm)', background: 'var(--sp-surface2)', border: '1px solid var(--sp-line)', color: installed ? 'var(--sp-accent)' : 'var(--sp-muted)' }}>
+						{Icons.disk}
+					</span>
+				)}
+				<span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+					{size && <span style={{ fontWeight: 800, fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>{size}</span>}
+					<span className="sp-muted" style={{ fontSize: 12.5 }}>{status}</span>
+				</span>
 			</span>
 		</div>
 	);
@@ -190,6 +209,12 @@ export function GamePage(props: any) {
 					{!shortcut && <FriendsCard friends={friends} />}
 				</aside>
 			</div>
+			{/* Historique des mises à jour et actualités du jeu, sous les cartes */}
+			{!shortcut && (
+				<div style={{ padding: '0 40px 56px' }}>
+					<NewsSection appid={appid} />
+				</div>
+			)}
 		</div>
 	);
 }

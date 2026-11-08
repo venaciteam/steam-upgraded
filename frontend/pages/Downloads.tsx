@@ -2,8 +2,9 @@
 // le jeu en cours en grande carte, puis la file (en attente, planifiés) et les téléchargements terminés.
 import { useEffect, useState } from 'react';
 import { appById, landscapeUrl, navigate, ROUTES } from '../core/steam';
+import { LOCAL_ID, sizeLabel } from '../core/machines';
 import { useArt } from '../core/art';
-import { speedLabel } from '../shell/Downloads';
+import { localOverview, remainingLabel, speedLabel } from '../shell/Downloads';
 import { openSteamSettings } from '../features/steamSettings';
 import { plural } from './library/data';
 import { IconClose } from './library/ui';
@@ -35,7 +36,7 @@ function itemBytes(it: any): [number, number] {
 
 function readState(): State {
 	const s = w.downloadsStore;
-	const ov = s?.DownloadOverview;
+	const ov = localOverview(s);
 	const appid = Number(ov?.update_appid || 0);
 	let active: Active | null = null;
 	if (appid) {
@@ -83,22 +84,6 @@ function useDownloads(): State {
 // ---------- Formats ----------
 
 /** Tailles comme Steam (base 1024) : « 1,1 Go ». */
-function sizeLabel(bytes: number): string {
-	if (bytes <= 0) return '';
-	const go = bytes / 1024 ** 3;
-	if (go >= 1) return `${go.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
-	const mo = bytes / 1024 ** 2;
-	return mo >= 1 ? `${Math.round(mo)} Mo` : `${Math.max(1, Math.round(bytes / 1024))} ko`;
-}
-
-function remainingLabel(sec: number): string {
-	if (sec < 0) return '';
-	if (sec < 60) return 'moins d’une minute';
-	const m = Math.round(sec / 60);
-	if (m < 60) return `${m} min`;
-	return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
-}
-
 function dayLabel(rt: number): string {
 	const d = new Date(rt * 1000);
 	const today = new Date();
@@ -227,7 +212,7 @@ function ActiveCard({ a }: { a: Active }) {
 						type="button"
 						className="sp-btn sp-btn--primary"
 						style={{ height: 44, padding: '0 20px' }}
-						onClick={() => (a.paused ? D().EnableAllDownloads(true) : D().PauseAppUpdate(a.appid))}
+						onClick={() => (a.paused ? D().EnableAllDownloads(true, LOCAL_ID) : D().PauseAppUpdate(a.appid, LOCAL_ID))}
 					>
 						{a.paused ? <IconResume /> : <IconPause />}
 						{a.paused ? 'Reprendre' : 'Pause'}
@@ -265,21 +250,21 @@ function Row({ it, first, last, noReorder }: { it: Item; first: boolean; last: b
 			<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
 				{it.kind === 'queued' && !noReorder && (
 					<>
-						<button type="button" className="sp-btn" style={iconBtn} aria-label={`Monter dans la file : ${n}`} disabled={first} onClick={() => D().MoveAppUpdateUp(it.appid)}>
+						<button type="button" className="sp-btn" style={iconBtn} aria-label={`Monter dans la file : ${n}`} disabled={first} onClick={() => D().MoveAppUpdateUp(it.appid, LOCAL_ID)}>
 							<IconUp />
 						</button>
-						<button type="button" className="sp-btn" style={iconBtn} aria-label={`Descendre dans la file : ${n}`} disabled={last} onClick={() => D().MoveAppUpdateDown(it.appid)}>
+						<button type="button" className="sp-btn" style={iconBtn} aria-label={`Descendre dans la file : ${n}`} disabled={last} onClick={() => D().MoveAppUpdateDown(it.appid, LOCAL_ID)}>
 							<IconDown />
 						</button>
 					</>
 				)}
 				{(it.kind === 'queued' || it.kind === 'paused') && (
-					<button type="button" className="sp-btn" style={smallBtn} aria-label={`${it.kind === 'paused' ? 'Reprendre' : 'Démarrer'} : ${n}`} onClick={() => D().ResumeAppUpdate(it.appid)}>
+					<button type="button" className="sp-btn" style={smallBtn} aria-label={`${it.kind === 'paused' ? 'Reprendre' : 'Démarrer'} : ${n}`} onClick={() => D().ResumeAppUpdate(it.appid, LOCAL_ID)}>
 						{it.kind === 'paused' ? 'Reprendre' : 'Démarrer'}
 					</button>
 				)}
 				{it.kind === 'scheduled' && (
-					<button type="button" className="sp-btn" style={smallBtn} aria-label={`Mettre à jour maintenant : ${n}`} onClick={() => D().ResumeAppUpdate(it.appid)}>
+					<button type="button" className="sp-btn" style={smallBtn} aria-label={`Mettre à jour maintenant : ${n}`} onClick={() => D().ResumeAppUpdate(it.appid, LOCAL_ID)}>
 						Mettre à jour maintenant
 					</button>
 				)}
@@ -298,7 +283,7 @@ function Row({ it, first, last, noReorder }: { it: Item; first: boolean; last: b
 						style={{ ...iconBtn, border: done ? 0 : undefined }}
 						aria-label={`${done ? 'Effacer de la liste' : 'Retirer de la file'} : ${n}`}
 						title={done ? 'Effacer de la liste' : 'Retirer de la file'}
-						onClick={() => D().RemoveFromDownloadList(it.appid)}
+						onClick={() => D().RemoveFromDownloadList(it.appid, LOCAL_ID)}
 					>
 						<IconClose />
 					</button>
@@ -344,7 +329,7 @@ export function DownloadsPage() {
 		.filter(Boolean)
 		.join(' · ');
 	const busy = !!st.active || waiting.some((i) => i.kind === 'queued');
-	const clearAll = () => done.forEach((i) => D().RemoveFromDownloadList(i.appid));
+	const clearAll = () => done.forEach((i) => D().RemoveFromDownloadList(i.appid, LOCAL_ID));
 	return (
 		<div className="sp-root" ref={pageRef}>
 			<main style={{ width: '100%', maxWidth: 1180, margin: '0 auto', padding: '32px 40px 64px', display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -354,7 +339,7 @@ export function DownloadsPage() {
 						<span className="sp-muted">{summary || 'Aucun téléchargement en cours'}</span>
 					</div>
 					{(busy || st.allPaused) && (
-						<button type="button" className="sp-btn" onClick={() => D().EnableAllDownloads(st.allPaused)}>
+						<button type="button" className="sp-btn" onClick={() => D().EnableAllDownloads(st.allPaused, LOCAL_ID)}>
 							{st.allPaused ? <IconResume /> : <IconPause />}
 							{st.allPaused ? 'Tout reprendre' : 'Tout mettre en pause'}
 						</button>

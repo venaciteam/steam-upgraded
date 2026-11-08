@@ -1,13 +1,14 @@
 // Big Picture › Fiche d'un jeu : bannière plein cadre, Jouer, Propriétés, copies familiales ;
 // cartes Temps de jeu, Succès, Copie utilisée, Amis. X change de copie, Y personnalise les visuels.
 import { useRef, useState } from 'react';
-import { installedHere } from '../core/machines';
+import { gameSize, sizeLabel } from '../core/machines';
 import { DialogButton, Focusable, Menu, MenuItem } from 'millennium';
 import { avatarUrl, bpNavigate, formatLastPlayed, playOrInstall, ROUTES } from '../core/steam';
 import { useSettings } from '../core/settings';
 import { usePath } from '../core/history';
 import { formatBigHours, forgetOwners, keyOf, plural } from '../pages/library/data';
-import { primaryState, setPreferredCopy, useAchievements, useFriendsWithGame, useGame, useLenders } from '../pages/game/data';
+import { isShortcut, primaryState, setPreferredCopy, useAchievements, useFriendsWithGame, useGame, useLenders } from '../pages/game/data';
+import { BpNews } from './News';
 import type { Copy } from '../pages/game/data';
 import { BpFrame, goBackBp, MemberAvatar } from './Frame';
 import { HeroImage, openArtworkBp, openPropertiesBp, showBpMenu } from './gameActions';
@@ -98,8 +99,21 @@ export function BpGame() {
 	const st = primaryState(app);
 	const several = !!copies && copies.length > 1;
 	const used = copies?.find((c) => c.preferred) || copies?.find((c) => c.isMe) || copies?.[0];
-	const size = Number(details?.lDiskUsageBytes || app.size_on_disk || 0);
-	const status = installedHere(app) ? `Installé${size ? ` · ${(size / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go` : ''}` : 'Non installé';
+	const { bytes, installed } = gameSize(app, details);
+	const size = sizeLabel(bytes);
+	// Taille bien visible (en gras), avant comme après l'installation
+	const status = (
+		<>
+			{installed ? 'Installé' : 'Non installé'}
+			{size && (
+				<>
+					{' · '}
+					<b style={{ color: '#fff', fontWeight: 800 }}>{size}</b>
+					{installed ? ' sur le disque' : ' nécessaires'}
+				</>
+			)}
+		</>
+	);
 	const mins = Number(app.minutes_playtime_forever || 0);
 	const inGame = friends?.filter((f) => f.inGame).length || 0;
 	const fade = oled
@@ -122,7 +136,7 @@ export function BpGame() {
 				<div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 26, width: '100%' }}>
 					<span style={{ fontSize: 88, fontWeight: 800, lineHeight: 0.95, color: '#fff', letterSpacing: '-0.01em', textShadow: '0 2px 20px rgba(0,0,0,.5)', maxWidth: 1400 }}>{app.display_name}</span>
 					<Focusable flow-children="row" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-						<DialogButton className="spbp-btn spbp-btn--primary" noFocusRing autoFocus disabled={st.disabled} onClick={() => playOrInstall(app)} onOKActionDescription={st.label} style={{ height: 76, fontSize: 28 }}>
+						<DialogButton className="spbp-btn spbp-btn--primary" noFocusRing autoFocus disabled={st.disabled && !st.downloading} onClick={() => (st.downloading ? bpNavigate(ROUTES.bpDownloads) : playOrInstall(app))} onOKActionDescription={st.downloading ? 'Voir les téléchargements' : st.label} style={{ height: 76, fontSize: 28 }}>
 							<svg width="28" height="28" viewBox="0 0 24 24" fill={st.kind === 'play' ? 'currentColor' : 'none'} stroke={st.kind === 'play' ? 'none' : 'currentColor'} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
 								<path d={BP_ICON[st.kind]} />
 							</svg>
@@ -206,6 +220,8 @@ export function BpGame() {
 					)}
 				</Card>
 			</section>
+			{/* Mises à jour du jeu (pas pour un jeu ajouté hors de Steam) */}
+			{!isShortcut(appid) && <BpNews appid={appid} />}
 		</BpFrame>
 	);
 }

@@ -1,7 +1,7 @@
 // Page Bibliothèque (/steamupgraded/library).
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from '../core/settings';
-import { AlbumTile, LIBRARY_CSS, Tile } from './library/Grid';
+import { AlbumTile, collapseHovered, LIBRARY_CSS, Tile } from './library/Grid';
 import { formatInt, Pill, pillTest, plural, Selection, selectionTest, sortGames, SortId, VIEWS, viewTest, normalize, useLibrary, Game, Library, NATIVE, NativeId, onCollectionRequested, selectionForCollection, takeRequestedCollection } from './library/data';
 import { Resume, SideCounts, Sidebar, SortMenu, Stats, StatsBand } from './library/Parts';
 import { IconClose, IconSearch } from './library/ui';
@@ -59,24 +59,12 @@ export function LibraryPage() {
 		Object.assign(memo, { sel, sort, pills, query });
 	}, [sel, sort, pills, query]);
 	const q = useDeferredValue(normalize(query.trim()));
-	// Le défilement referme la tuile agrandie : classe posée directement sur la grille (aucun rendu React),
-	// retirée au prochain vrai déplacement de la souris (Chromium simule des mouvements après un défilement).
+	// Le défilement referme la tuile agrandie ; la suivante ne s'agrandit qu'au prochain vrai mouvement de souris
+	// (library/Grid.tsx : aucune classe basculée sur la grille entière, à-coups au début du défilement sinon).
 	const gridRef = useRef<HTMLDivElement>(null);
-	const ptr = useRef({ x: 0, y: 0, sx: 0, sy: 0 });
 	const onScroll = () => {
 		if (mainRef.current) memo.scroll = mainRef.current.scrollTop;
-		const el = gridRef.current;
-		if (!el || el.classList.contains('spl-noexp')) return;
-		el.classList.add('spl-noexp');
-		ptr.current.sx = ptr.current.x;
-		ptr.current.sy = ptr.current.y;
-	};
-	const onMouseMove = (e: any) => {
-		const p = ptr.current;
-		p.x = e.screenX;
-		p.y = e.screenY;
-		const el = gridRef.current;
-		if (el && el.classList.contains('spl-noexp') && Math.abs(p.x - p.sx) + Math.abs(p.y - p.sy) > 3) el.classList.remove('spl-noexp');
+		collapseHovered();
 	};
 
 	const counts = useMemo<SideCounts>(() => {
@@ -166,7 +154,7 @@ export function LibraryPage() {
 			<style>{LIBRARY_CSS}</style>
 			<Sidebar lib={lib} counts={counts} sel={sel} onSelect={setSel} />
 
-			<main ref={mainRef} aria-label="Bibliothèque" onScroll={onScroll} onMouseMove={onMouseMove} style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+			<main ref={mainRef} aria-label="Bibliothèque" onScroll={onScroll} style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
 				<div style={{ padding: '26px 32px 56px', display: 'flex', flexDirection: 'column', gap: 28 }}>
 					<header style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
 						<h1 className="sp-h1">Bibliothèque</h1>

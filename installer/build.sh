@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compile l'installeur à envoyer : plugin (.star, en release) puis exécutable Tauri, copié dans installer/dist/
 # (Windows : .exe ; macOS : app zippée Steam-Upgraded-macOS.zip).
-# Usage : bash installer/build.sh
+# Usage : bash installer/build.sh   (SU_STAR_READY=1 : garde le .star déjà présent dans installer/payload/, sans recompiler le plugin)
 # Simulation (rien ne touche le vrai Steam) : "installer/dist/Installer Steam Upgraded <version>.exe" --simulation [vierge|ancien|installe|sans-steam|erreur-reseau|steam-bloque]
 set -e
 cd "$(dirname "$0")/.."
@@ -18,10 +18,16 @@ fi
 LOCK=.reload.lock
 for i in $(seq 1 150); do mkdir "$LOCK" 2>/dev/null && break; sleep 2; done
 BACKEND_COPY=$(mktemp -d)
-trap 'cp -rf "$BACKEND_COPY/backend/." backend/ 2>/dev/null; rm -rf "$BACKEND_COPY"; rmdir "$LOCK" 2>/dev/null' EXIT
+# Rien ne doit échouer ici : sans plugin à compiler (SU_STAR_READY=1), aucune copie du backend n'a été faite.
+trap '[ -d "$BACKEND_COPY/backend" ] && cp -rf "$BACKEND_COPY/backend/." backend/ 2>/dev/null; rm -rf "$BACKEND_COPY"; rmdir "$LOCK" 2>/dev/null; true' EXIT
 
-node node_modules/typescript/bin/tsc --noEmit -p .
 mkdir -p installer/payload installer/dist
+if [ "${SU_STAR_READY:-}" = 1 ]; then
+  # Plugin déjà compilé ailleurs (le même .star sert à Windows et au Mac) : publication par GitHub, où starlight n'a pas
+  # de binaire Mac ARM. Le .star doit déjà être dans installer/payload/.
+  [ -f installer/payload/com.venacity.steamupgraded.star ] || { echo "SU_STAR_READY=1 : installer/payload/com.venacity.steamupgraded.star manque"; exit 1; }
+else
+node node_modules/typescript/bin/tsc --noEmit -p .
 # `starlight pack --release` abîme l'UTF-8 des chaînes Lua (« refusée » arrivait « refusÃÂ©e » dans Steam) :
 # leurs accents sont écrits en octets échappés le temps de la compilation, puis les fichiers d'origine sont remis.
 cp -r backend "$BACKEND_COPY/"
@@ -29,6 +35,7 @@ find backend -name '*.lua' -print0 | xargs -0 node installer/tools/lua-ascii.mjs
 # Attention : même avec -o, starlight redémarre le backend du plugin dans le Steam ouvert (HMR).
 node node_modules/@steambrew/starlight/bin/starlight.js pack --release -o installer/payload 2>&1 | tail -1
 cp -rf "$BACKEND_COPY/backend/." backend/
+fi
 (cd installer/src-tauri && cargo build --release)
 
 if [ "$(uname)" = "Darwin" ]; then

@@ -5,6 +5,7 @@ import { filterDeals, loadFeatured, loadWishlist, mySteamId, ownershipMap, PAGE,
 import { Banner, DealRow, Notice, OpenFullStore, SectionHead, Skeleton, STORE_CSS, StoreTabs, WishlistSection } from './store/sections';
 import { FilterChips, FilterPill, Filters, IconRefresh, NO_FILTERS, SortId, SortMenu } from './store/ui';
 import { usePageTransition } from '../core/transitions';
+import { StoreSearch } from './store/search';
 
 // Conservés entre deux visites de la page (le cache des données vit dans data.ts)
 let keptFilters: Filters = NO_FILTERS;
@@ -48,10 +49,11 @@ export function StorePage() {
 						<h1 className="sp-h1">Magasin</h1>
 						<div className="sp-muted" style={{ marginTop: 2 }}>Les promos qui vous concernent. Prix du magasin : {region.countryName}, en {region.currencyName}.</div>
 					</div>
+					<StoreSearch />
 					<button type="button" className="sp-btn sp-btn--icon" aria-label="Actualiser les promos" title="Actualiser" onClick={refreshAll}>
 						<IconRefresh />
 					</button>
-					<OpenFullStore />
+					<OpenFullStore icon />
 					<StoreTabs current="store" />
 				</header>
 

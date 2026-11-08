@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react';
 import { DialogButton, Focusable, Menu, MenuItem, MenuSeparator } from 'millennium';
 import { appById, landscapeUrl } from '../core/steam';
-import { speedLabel } from '../shell/Downloads';
+import { LOCAL_ID } from '../core/machines';
+import { localOverview, speedLabel } from '../shell/Downloads';
 import { plural } from '../pages/library/data';
 import { BpFrame, goBackBp, useClock } from './Frame';
 import { HeroImage, Landscape, openGame, showBpMenu } from './gameActions';
@@ -37,7 +38,7 @@ function itemBytes(it: any): [number, number] {
 }
 
 function readActive(): Active | null {
-	const ov = store()?.DownloadOverview;
+	const ov = localOverview(store());
 	const appid = Number(ov?.update_appid || 0);
 	if (!appid) return null;
 	const p = ov?.progress?.[DOWNLOAD];
@@ -135,9 +136,9 @@ function itemMenu(it: Item, name: string) {
 		<Menu label={name}>
 			{/* « Fiche du jeu » d'abord : c'est là qu'arrive le focus, un appui réflexe ne lance rien */}
 			<MenuItem onSelected={() => openGame(it.appid)}>Fiche du jeu</MenuItem>
-			{it.kind !== 'done' && <MenuItem onSelected={() => D().ResumeAppUpdate(it.appid)}>{it.kind === 'next' ? 'Passer en premier' : 'Télécharger maintenant'}</MenuItem>}
+			{it.kind !== 'done' && <MenuItem onSelected={() => D().ResumeAppUpdate(it.appid, LOCAL_ID)}>{it.kind === 'next' ? 'Passer en premier' : 'Télécharger maintenant'}</MenuItem>}
 			<MenuSeparator />
-			<MenuItem onSelected={() => D().RemoveFromDownloadList(it.appid)}>Retirer de la liste</MenuItem>
+			<MenuItem onSelected={() => D().RemoveFromDownloadList(it.appid, LOCAL_ID)}>Retirer de la liste</MenuItem>
 		</Menu>,
 	);
 }
@@ -152,7 +153,7 @@ function Capsule({ it, first }: { it: Item; first: boolean }) {
 			autoFocus={first}
 			onClick={() => itemMenu(it, name)}
 			onOKActionDescription="Options"
-			onOptionsButton={it.kind === 'next' ? () => D().ResumeAppUpdate(it.appid) : undefined}
+			onOptionsButton={it.kind === 'next' ? () => D().ResumeAppUpdate(it.appid, LOCAL_ID) : undefined}
 			onOptionsActionDescription={it.kind === 'next' ? 'Passer en premier' : undefined}
 			aria-label={`${name}, ${stateLine(it)}`}
 		>
@@ -192,7 +193,7 @@ function ActiveHero({ a, autoUpdates, clock }: { a: Active; autoUpdates: string;
 					</span>
 				</div>
 				<Focusable flow-children="row" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-					<DialogButton className="spbp-btn spbp-btn--primary" noFocusRing autoFocus onClick={() => D().EnableAllDownloads(a.paused)} onOKActionDescription={a.paused ? 'Reprendre' : 'Mettre en pause'} style={{ height: 76, fontSize: 26 }}>
+					<DialogButton className="spbp-btn spbp-btn--primary" noFocusRing autoFocus onClick={() => D().EnableAllDownloads(a.paused, LOCAL_ID)} onOKActionDescription={a.paused ? 'Reprendre' : 'Mettre en pause'} style={{ height: 76, fontSize: 26 }}>
 						<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 							<path d={a.paused ? 'M7 4.5v15l12-7.5z' : 'M6 4h4v16H6zM14 4h4v16h-4z'} />
 						</svg>
