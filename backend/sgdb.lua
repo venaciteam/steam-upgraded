@@ -244,8 +244,19 @@ end
 -- Le module http de Millennium coupe le corps de la réponse au premier octet nul : inutilisable
 -- pour une image. Téléchargement binaire commun : binary.lua.
 
+-- Millennium refuse une valeur de retour de plus de 8 Mio : une grosse image (bannière en 4K, animé) part
+-- donc en morceaux de 3 Mio (multiple de 3 : les morceaux en base64 se mettent bout à bout). Le premier
+-- revient avec sgdb_download, les suivants avec sgdb_chunk ; seule la dernière image est gardée en mémoire.
+local CHUNK = 3 * 1024 * 1024
+local pending = { id = 0, bytes = nil }
+
+local function chunk_b64(bytes, index)
+    return base64_encode(bytes:sub(index * CHUNK + 1, (index + 1) * CHUNK))
+end
+
 ---@ffi
----Télécharge une image SteamGridDB et la renvoie en base64 avec son format (png ou jpg).
+---Télécharge une image SteamGridDB et renvoie son format (png ou jpg) et le premier morceau en base64 ;
+---« chunks » donne le nombre de morceaux, les suivants se lisent avec sgdb_chunk(id, index).
 ---@param url string
 ---@return string
 function sgdb_download(url)
@@ -261,7 +272,26 @@ function sgdb_download(url)
         return fail("Format d'image non pris en charge par Steam (" .. tostring(format or "inconnu") .. ").")
     end
     logger:info("SteamGridDB : image téléchargée (" .. format .. ", " .. #bytes .. " octets)")
-    return result({ ok = true, format = format, size = #bytes, base64 = base64_encode(bytes) })
+    local chunks = math.ceil(#bytes / CHUNK)
+    pending.id = pending.id + 1
+    pending.bytes = chunks > 1 and bytes or nil
+    return result({ ok = true, format = format, size = #bytes, id = pending.id, chunks = chunks, base64 = chunk_b64(bytes, 0) })
+end
+
+---@ffi
+---Morceau suivant (index à partir de 1) de la dernière image téléchargée par sgdb_download.
+---@param id integer
+---@param index integer
+---@return string
+function sgdb_chunk(id, index)
+    id, index = tonumber(id), tonumber(index)
+    local bytes = pending.bytes
+    if not bytes or id ~= pending.id or not index or index < 1 or index * CHUNK >= #bytes then
+        return fail("Morceau d'image introuvable : relancez l'application du visuel.")
+    end
+    local out = chunk_b64(bytes, index)
+    if (index + 1) * CHUNK >= #bytes then pending.bytes = nil end
+    return result({ ok = true, base64 = out })
 end
 
 ---@ffi

@@ -101,7 +101,10 @@ function Hero({ app, oled }: { app: any; oled: boolean }) {
 		: { margin: 0 };
 
 	return (
-		<div style={{ position: 'relative', height: 'clamp(240px, 30vw, 420px)', overflow: 'hidden', background: 'var(--sp-surface)', ...frame }}>
+		// Hauteur suivie sur le format des bannières Steam (3840 × 1240) pour les voir en entier, sans dépasser 70 % de la
+		// hauteur de la fenêtre (le reste de la fiche doit commencer à l'écran). Pas d'aspect-ratio : plafonné, il réduirait
+		// aussi la largeur sur les écrans 21:9.
+		<div style={{ position: 'relative', height: 'clamp(240px, calc((100vw - 64px) * 1240 / 3840), max(420px, 70vh))', overflow: 'hidden', background: 'var(--sp-surface)', ...frame }}>
 			{!heroFailed && heroes.length > 0 && (
 				<FallbackImg
 					srcs={heroes}
@@ -120,7 +123,7 @@ function Hero({ app, oled }: { app: any; oled: boolean }) {
 						srcs={logos}
 						alt={app.display_name}
 						onFail={() => setLogoFailed(true)}
-						style={{ maxWidth: 'min(42%, 520px)', maxHeight: 'clamp(90px, 11vw, 170px)', objectFit: 'contain', objectPosition: 'left bottom', filter: 'drop-shadow(0 4px 18px rgba(0,0,0,.55))' }}
+						style={{ maxWidth: 'min(42%, 640px)', maxHeight: 'clamp(90px, 11vw, 230px)', objectFit: 'contain', objectPosition: 'left bottom', filter: 'drop-shadow(0 4px 18px rgba(0,0,0,.55))' }}
 					/>
 				) : (
 					<h1 className="sp-h1" style={{ fontSize: 'clamp(30px, 4vw, 52px)', lineHeight: 1.05, maxWidth: '70%', textShadow: '0 2px 16px rgba(0,0,0,.7)' }}>

@@ -239,6 +239,58 @@ export async function setPreferredCopy(appid: number, accountId: number): Promis
 	return Number(r) === 1;
 }
 
+/**
+ * Qui joue, et sur quelle copie. Steam ne donne que le verrou de la copie utilisée par ce compte
+ * (`strLockedBySteamID` des détails, ce que le client natif affiche en « Utilisé par un membre de votre famille
+ * Steam : … ») et le nombre de membres en jeu (`unMembersPlaying`). Le reste se déduit de la présence :
+ * un membre qui possède le jeu joue sur sa copie ; s'il ne reste qu'un joueur et qu'une copie libre, c'est celle-là.
+ * `onCopy` : accountId du propriétaire de la copie → joueurs ; `elsewhere` : joueurs dont la copie est inconnue ;
+ * `unknown` : membres en jeu qu'on ne sait pas nommer (présence masquée, pas en contact).
+ */
+export type CopyUse = { onCopy: Map<number, number[]>; elsewhere: number[]; unknown: number };
+
+export function copyUse(appid: number, details: any, copies: Copy[] | null): CopyUse {
+	const me = myAccountId();
+	const onCopy = new Map<number, number[]>();
+	const total = Number(details?.unMembersPlaying || 0);
+	const used = accountIdOf(String(details?.strOwnerSteamID || '0'));
+	const lockedBy = accountIdOf(String(details?.strLockedBySteamID || '0'));
+	const place = (owner: number, player: number) => onCopy.set(owner, [...(onCopy.get(owner) || []), player]);
+
+	// membres de la famille (sauf ce compte) en jeu sur cet appid d'après leur présence
+	const cache = w.friendStore?.m_FriendsUIFriendStore?.m_mapPlayerCache;
+	const ids = new Set<number>([...familyMembers().keys(), ...(copies || []).map((c) => c.accountId)]);
+	ids.delete(me);
+	let players = [...ids].filter((id) => Number(cache?.get(id)?.m_persona?.m_unGamePlayedAppID) === appid);
+
+	const lockValid = lockedBy > 0 && lockedBy !== me && used > 0;
+	if (lockValid) {
+		place(used, lockedBy);
+		players = players.filter((p) => p !== lockedBy);
+	}
+	const owners = new Set((copies || []).map((c) => c.accountId));
+	const rest: number[] = [];
+	for (const p of players) {
+		if (owners.has(p)) place(p, p);
+		else rest.push(p);
+	}
+	// copies libres : ni occupées, ni celle de ce compte (libre si Steam ne la dit pas verrouillée)
+	const free = (copies || []).filter((c) => !onCopy.has(c.accountId) && c.accountId !== used);
+	let elsewhere = rest;
+	if (used > 0 && rest.length === 1 && free.length === 1) {
+		place(free[0].accountId, rest[0]);
+		elsewhere = [];
+	}
+	const named = [...onCopy.values()].reduce((n, l) => n + l.length, 0) + elsewhere.length;
+	return { onCopy, elsewhere, unknown: Math.max(0, total - named) };
+}
+
+/** « Alex », « Alex et Camille », « Alex, Camille et Noa ». */
+export function namesList(ids: number[]): string {
+	const names = ids.map((id) => playerName(id));
+	return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
+}
+
 // ---------- Collections ----------
 
 export function collectionsOf(appid: number): { id: string; name: string }[] {

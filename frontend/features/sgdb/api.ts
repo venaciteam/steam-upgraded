@@ -124,8 +124,11 @@ export const realProvider: Provider = {
 		return { items: Array.isArray(d.items) ? d.items : [], total: d.total || 0, page: d.page || 0, limit: d.limit || 50 };
 	},
 	async download(item) {
+		// Au-delà de 3 Mio, l'image arrive en plusieurs morceaux (Millennium plafonne une réponse à 8 Mio).
 		const d = await call(backend.sgdb_download(item.url));
-		return { base64: d.base64, format: d.format };
+		const parts: string[] = [d.base64];
+		for (let i = 1; i < (d.chunks || 1); i++) parts.push((await call(backend.sgdb_chunk(d.id, i))).base64);
+		return { base64: parts.join(''), format: d.format };
 	},
 	async apply(appid, slot, img) {
 		await w.SteamClient.Apps.SetCustomArtworkForApp(appid, img.base64, img.format, slot.asset);
