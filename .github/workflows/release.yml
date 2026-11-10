@@ -5,9 +5,9 @@
 # Si une publication en brouillon existe déjà pour l'étiquette (avec ses notes), elle est complétée puis publiée.
 name: Publication
 
+# SECOURS seulement : les versions se fabriquent sur les machines (tools/publier.ps1 sur le PC, puis
+# tools/publier.sh sur le Mac, dépôt privé). Ce workflow ne part qu'à la main, avec l'étiquette à publier.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:

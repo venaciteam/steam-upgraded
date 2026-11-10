@@ -366,4 +366,10 @@ ${both('.spl-panel-in')}{opacity:0;transform:translateY(-4px);}
 .spl-resume-img img{display:block;width:100%;aspect-ratio:460/215;object-fit:cover;transition:transform .35s cubic-bezier(.2,.8,.3,1),filter .2s ease;}
 .spl-resume:hover .spl-resume-img img{transform:scale(1.04);filter:brightness(1.08);}
 @media (prefers-reduced-motion:reduce){.spl-resume,.spl-resume-img img{transition:none;}.spl-resume:hover .spl-resume-img img{transform:none;}}
+/* Bandeau de chiffres : une rangée tant que la carte famille garde sa légende sur deux colonnes, sinon la carte famille passe seule en dessous (largeur de la zone, pas de la fenêtre : la barre latérale compte) */
+.spl-stats{container-type:inline-size;}
+.spl-stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
+.spl-stats-grid--family{grid-template-columns:repeat(5,minmax(0,1fr));}
+.spl-stat-wide{grid-column:span 2;}
+@container (max-width: 900px){.spl-stats-grid--family{grid-template-columns:repeat(3,minmax(0,1fr));}.spl-stat-wide{grid-column:1 / -1;}}
 `;

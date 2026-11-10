@@ -137,8 +137,9 @@ function ResumeCard({ g, onChanged }: { g: Game; onChanged: () => void }) {
 					<img src={landscape} alt="" onError={() => setBroken(true)} />
 				)}
 			</button>
-			<div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
-				<div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+			{/* Carte étroite : le bouton passe sous le titre plutôt que de le réduire à une lettre */}
+			<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
+				<div style={{ flex: '1 1 140px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
 					<span style={{ fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.name}</span>
 					<span className="sp-muted" style={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
 						{formatLastPlayed(g.last)} · {formatBigHours(g.mins)} au total
@@ -181,10 +182,10 @@ export type Stats = {
 
 function Stat({ label, value, sub, children, wide }: { label: string; value: string; sub?: string; children?: any; wide?: boolean }) {
 	return (
-		<div className="sp-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 4, gridColumn: wide ? 'span 2' : undefined, minWidth: 0 }}>
+		<div className={`sp-card${wide ? ' spl-stat-wide' : ''}`} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
 			<span className="sp-label">{label}</span>
 			<div style={{ display: 'flex', alignItems: 'center', gap: 22, minWidth: 0 }}>
-				<div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 'none' }}>
+				<div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: children ? 'none' : '0 1 auto', minWidth: 0 }}>
 					<span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.15, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
 					{sub && (
 						<span className="sp-muted" style={{ fontSize: 12.5 }}>
@@ -203,30 +204,33 @@ export function StatsBand({ st }: { st: Stats }) {
 	// Sans jeu prêté (pas de Famille Steam), pas de carte « Prêtés par la famille »
 	const family = st.borrowed > 0;
 	return (
-		<section aria-label="Chiffres de la bibliothèque" style={{ display: 'grid', gridTemplateColumns: `repeat(${family ? 5 : 3}, minmax(0, 1fr))`, gap: 14 }}>
-			<Stat label="Ces 2 semaines" value={formatBigHours(st.mins2w)} sub={st.played2w ? `sur ${plural(st.played2w, 'jeu', 'jeux')}` : 'aucune session'} />
-			<Stat label="Temps total" value={formatBigHours(st.total)} sub={`sur ${plural(st.launched, 'jeu lancé', 'jeux lancés')}`} />
-			<Stat label="Jamais lancés" value={formatInt(st.never)} sub={`${pct} % des ${plural(st.count, 'jeu', 'jeux')}`} />
-			{family && (
-				<Stat label="Prêtés par la famille" value={formatInt(st.borrowed)} sub={`${st.count ? Math.round((st.borrowed / st.count) * 100) : 0} % du total`} wide>
-					<span aria-hidden="true" style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 2 }}>
-						{st.byLender.map(({ p, n }) => (
-							<span key={p.accountId} style={{ flex: n, background: p.color }} />
-						))}
-					</span>
-					<span style={{ display: 'grid', gridTemplateColumns: 'repeat(2, max-content)', columnGap: 18, rowGap: 2, fontSize: 12.5, lineHeight: 1.35 }}>
-						{st.byLender.map(({ p, n }) => (
-							<span key={p.accountId} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-								<Dot color={p.color} />
-								<span>{p.name}</span>
-								<span className="sp-muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
-									{n}
+		<section aria-label="Chiffres de la bibliothèque" className="spl-stats">
+			<div className={`spl-stats-grid${family ? ' spl-stats-grid--family' : ''}`}>
+				<Stat label="Ces 2 semaines" value={formatBigHours(st.mins2w)} sub={st.played2w ? `sur ${plural(st.played2w, 'jeu', 'jeux')}` : 'aucune session'} />
+				<Stat label="Temps total" value={formatBigHours(st.total)} sub={`sur ${plural(st.launched, 'jeu lancé', 'jeux lancés')}`} />
+				<Stat label="Jamais lancés" value={formatInt(st.never)} sub={`${pct} % des ${plural(st.count, 'jeu', 'jeux')}`} />
+				{family && (
+					<Stat label="Prêtés par la famille" value={formatInt(st.borrowed)} sub={`${st.count ? Math.round((st.borrowed / st.count) * 100) : 0} % du total`} wide>
+						<span aria-hidden="true" style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 2 }}>
+							{st.byLender.map(({ p, n }) => (
+								<span key={p.accountId} style={{ flex: n, background: p.color }} />
+							))}
+						</span>
+						{/* Colonnes réduites si la place manque : un pseudo trop long finit en « … » au lieu de sortir de la carte */}
+						<span style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, max-content))', columnGap: 18, rowGap: 2, fontSize: 12.5, lineHeight: 1.35 }}>
+							{st.byLender.map(({ p, n }) => (
+								<span key={p.accountId} style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', minWidth: 0 }}>
+									<Dot color={p.color} />
+									<span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+									<span className="sp-muted" style={{ flex: 'none', fontVariantNumeric: 'tabular-nums' }}>
+										{n}
+									</span>
 								</span>
-							</span>
-						))}
-					</span>
-				</Stat>
-			)}
+							))}
+						</span>
+					</Stat>
+				)}
+			</div>
 		</section>
 	);
 }
