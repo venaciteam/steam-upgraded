@@ -24,7 +24,9 @@ const WISH_CSS = `
 .spw-row:hover .spw-cart--buy:not(:disabled){background:var(--sp-accent);border-color:var(--sp-accent);color:var(--sp-accent-ink);box-shadow:var(--sp-glow);}
 .spw-heart{width:36px;height:36px;padding:0;border-radius:11px;justify-content:center;color:var(--sp-accent);}
 .spw-heart[data-confirm]{width:auto;padding:0 10px;color:var(--sp-busy);font-size:12px;font-weight:800;}
-@media (max-width: 1100px){.spw-row{grid-template-columns:22px 120px minmax(0,1fr) 120px 176px 36px;}.spw-review{display:none;}}
+.spw-review{display:flex;flex-direction:column;gap:2px;font-size:12px;}
+/* Fenêtre étroite : sans la colonne des évaluations (son display ne doit pas être en style en ligne, il l'emporterait sur le none) */
+@media (max-width: 1100px){.spw-row{grid-template-columns:22px 120px minmax(0,1fr) 150px 176px 36px;}.spw-review{display:none;}}
 `;
 
 function Stat({ value, label, deal }: { value: string; label: string; deal?: boolean }) {
@@ -71,8 +73,8 @@ function WishRow({ d, rank, owned, onRemoved }: { d: Deal; rank: number; owned?:
 	return (
 		<div className="spw-row">
 			<span className="sp-muted" style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{rank}</span>
-			<button type="button" onClick={() => openStorePage(d.appid)} aria-label={`Page de vente de ${name}`} style={{ padding: 0, border: 0, background: 'transparent', borderRadius: 'var(--sp-r-sm)' }}>
-				<Capsule deal={d} width={150} />
+			<button type="button" onClick={() => openStorePage(d.appid)} aria-label={`Page de vente de ${name}`} style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', borderRadius: 'var(--sp-r-sm)' }}>
+				<Capsule deal={d} />
 			</button>
 			<button type="button" onClick={() => openStorePage(d.appid)} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: 0, border: 0, background: 'transparent', textAlign: 'left' }}>
 				<span style={{ maxWidth: '100%', fontWeight: 800, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
@@ -84,7 +86,7 @@ function WishRow({ d, rank, owned, onRemoved }: { d: Deal; rank: number; owned?:
 					</span>
 				)}
 			</button>
-			<span className="spw-review" style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }}>
+			<span className="spw-review">
 				{d.reviewLabel ? (
 					<>
 						<b style={{ color: reviewTone(reviewScore(d)) }}>{capitalize(d.reviewLabel)}</b>
