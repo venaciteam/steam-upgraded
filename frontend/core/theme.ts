@@ -47,6 +47,8 @@ export function tokens(s: Settings): Record<string, string> {
 		'--sp-online': '#4fd18b',
 		'--sp-away': '#e7b43c',
 		'--sp-busy': '#e0694f',
+		// Succès (notifications du bureau)
+		'--sp-trophy': '#f2c14e',
 		'--sp-deal': '#4fd18b',
 		'--sp-deal-ink': '#06180d',
 		'--sp-glow': s.oledHalo ? `0 0 28px ${accent}66` : 'none',
@@ -217,6 +219,25 @@ ${hdrImages}
 .DesktopUI .contextMenu .ContextMenuSeparator{height:1px !important;margin:4px 8px !important;background:var(--sp-line) !important;border:0 !important;}
 .DesktopUI .contextMenu .ContextMenuSeparator + .contextMenuItem{border-top:0 !important;}
 .ContextMenuPopupBody,body.ContextMenuPopup{background:transparent !important;}
+/* Panneau des notifications (cloche) : fenêtre réutilisée par Steam, qui donne au menu une largeur minimale égale à sa
+   largeur mesurée à l'ouverture précédente ; en content-box, padding et contour s'y ajoutaient et la fenêtre gagnait
+   28 px à chaque ouverture. Largeur fixe, carte unique (plus de carte dans la carte), sans ombre (la fenêtre la coupait en carré). */
+.contextMenu{box-sizing:border-box !important;}
+.ContextMenuPosition:has(.NotificationsMenu){min-width:0 !important;width:360px !important;padding:8px !important;box-shadow:none !important;}
+.contextMenu .NotificationsMenu{width:100% !important;max-width:none !important;margin:0 !important;padding:0 !important;background:transparent !important;border:0 !important;box-shadow:none !important;}
+.contextMenu .NotificationsMenu > div{width:auto !important;margin:0 !important;padding:0 !important;background:transparent !important;border:0 !important;box-shadow:none !important;}
+.contextMenu .NotificationHeader{display:flex !important;align-items:center;justify-content:space-between;gap:12px;height:auto !important;margin:0 !important;padding:4px 4px 10px 8px !important;background:transparent !important;border:0 !important;border-bottom:1px solid var(--sp-line) !important;}
+.contextMenu .AllNotificationsTitle{margin:0 !important;font-size:15px !important;font-weight:800 !important;color:var(--sp-text) !important;}
+.contextMenu .AllNotificationsButton{height:auto !important;min-width:0 !important;margin:0 !important;padding:5px 12px !important;background:var(--sp-surface2) !important;border:1px solid var(--sp-line) !important;border-radius:999px !important;box-shadow:none !important;color:var(--sp-text) !important;font-family:var(--sp-font) !important;font-size:12.5px !important;font-weight:700 !important;cursor:pointer;}
+.contextMenu .AllNotificationsButton:hover{border-color:var(--sp-accent) !important;color:var(--sp-accent) !important;}
+.contextMenu .NotificationsMenuScrollable{width:auto !important;height:auto !important;max-height:400px;margin:0 !important;padding:6px 0 0 !important;}
+.contextMenu .NotificationsMenuEntriesContainer{display:flex;flex-direction:column;gap:2px;}
+.contextMenu .EmptyNotificationsCtn{margin:0 !important;padding:14px 10px 8px !important;text-align:center;background:transparent !important;}
+.contextMenu .EmptyNotificationsTitle{margin:0 0 4px !important;font-size:13px !important;font-weight:700 !important;color:var(--sp-text) !important;}
+.contextMenu .EmptyNotificationsBody{margin:0 !important;font-size:12px !important;line-height:1.45 !important;color:var(--sp-muted) !important;}
+.contextMenu .NotificationMenuItem{display:flex !important;align-items:center;gap:10px;margin:0 !important;padding:9px 10px !important;background:transparent !important;border:0 !important;border-radius:var(--sp-r-sm) !important;color:var(--sp-text) !important;font-size:13px !important;font-weight:600 !important;}
+.contextMenu .NotificationMenuItem:hover,.contextMenu .NotificationMenuItem:focus{background:var(--sp-surface2) !important;}
+.contextMenu .NotificationMenuItem svg{flex:none;width:18px !important;height:18px !important;color:var(--sp-accent) !important;}
 /* Menu d'un jeu (pages/library/menu.tsx) : en-tête, icônes, titres de groupe */
 .sp-mi-head{display:flex;flex-direction:column;gap:2px;min-width:250px;padding:8px 12px 10px;margin-bottom:6px;border-bottom:1px solid var(--sp-line);font-family:var(--sp-font);}
 .sp-mi-title{font-weight:800;font-size:14px;color:var(--sp-text);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -389,27 +410,37 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .LoginForm .SubmitButton{background:var(--sp-accent) !important;color:var(--sp-accent-ink) !important;border-radius:var(--sp-r-md) !important;font-weight:800 !important;box-shadow:var(--sp-glow) !important;}
 .LoginForm .Checkbox{border-radius:6px !important;}
 [class*="QRCodeContainer"]{border-radius:var(--sp-r-md) !important;overflow:hidden;}
-/* Notifications du bureau (une petite fenêtre par notification, taille fixée par Steam) : carte du thème */
-.DesktopToastContainer{background:transparent !important;}
+/* Notifications du bureau : une petite fenêtre par notification (283 × 70 px, taille fixée par Steam), écartée des bords
+   de l'écran par features/toastSkin.ts. Carte « Fondu » : bande et intitulé de la couleur du type (accent par défaut,
+   contact en vert, succès en or), image de la notification floutée en fondu à gauche (--sp-toast-img, posée par toastSkin). */
+.DesktopToastContainer{background:transparent !important;overflow:hidden;}
 .DesktopToastContainer *{font-family:var(--sp-font) !important;}
-.DesktopToastContainer .Middle{box-sizing:border-box;height:100%;overflow:hidden;background:var(--sp-surface) !important;border:1px solid var(--sp-line);border-radius:var(--sp-r-lg);}
-.DesktopToastContainer .Middle > div:has(> svg){display:none !important;}
-.DesktopToastContainer .AppLogo,.DesktopToastContainer .AppLogo .Container,.DesktopToastContainer .AppLogo img{border-radius:12px !important;}
+.DesktopToastContainer > div{height:100vh;}
+.DesktopToastContainer .Middle{--sp-toast-c:var(--sp-accent);position:relative;box-sizing:border-box;height:100vh !important;overflow:hidden;background:var(--sp-surface) !important;border:1px solid var(--sp-line);border-radius:var(--sp-r-lg);}
+.DesktopToastContainer .Middle:has(.GroupMessageBody,.AvatarStatus,.FriendOnlineColor,.FriendInGameAppColor){--sp-toast-c:var(--sp-online);}
+.DesktopToastContainer .Middle:has(.AchievementIconWrapper){--sp-toast-c:var(--sp-trophy);}
+.DesktopToastContainer .Middle::before{display:none !important;}
+.DesktopToastContainer .Middle::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sp-toast-c);z-index:2;}
+.DesktopToastContainer .DesktopToastBackground{display:block !important;position:absolute !important;left:0 !important;top:0 !important;bottom:0 !important;width:60% !important;height:auto !important;background:var(--sp-toast-img, none) center/cover no-repeat !important;filter:blur(16px) saturate(1.4) !important;opacity:.5 !important;transform:scale(1.3) !important;transform-origin:left center;-webkit-mask-image:linear-gradient(90deg,#000 15%,transparent 85%);mask-image:linear-gradient(90deg,#000 15%,transparent 85%);z-index:0;pointer-events:none;}
+.DesktopToastContainer .DesktopToastBackground > *{display:none !important;}
+.DesktopToastContainer .Panel{position:relative;z-index:1;box-sizing:border-box;height:100% !important;background:transparent !important;}
+.DesktopToastContainer .DesktopToastTemplate{box-sizing:border-box !important;height:100% !important;padding:0 12px 0 16px !important;align-items:center !important;background:transparent !important;}
+.DesktopToastContainer .AppLogo,.DesktopToastContainer .AppLogo .Container,.DesktopToastContainer .AppLogo img,.DesktopToastContainer .AchievementIconWrapper,.DesktopToastContainer .AchievementIconWrapper img{border-radius:10px !important;}
 .DesktopToastContainer .AppLogo .Container{background:var(--sp-surface2) !important;}
+.DesktopToastContainer .Panel > div:first-child > img{border-radius:50% !important;corner-shape:round !important;}
+.DesktopToastContainer .AvatarStatus,.DesktopToastContainer .GroupMessageIcon{display:none !important;}
+.DesktopToastContainer .Content{color:var(--sp-text) !important;display:flex !important;flex-direction:column;justify-content:center;align-self:stretch;margin-top:0 !important;margin-bottom:0 !important;}
+.DesktopToastContainer .AchievementTextSection{justify-content:center !important;}
 .DesktopToastContainer .Header .Icon{display:none !important;}
-.DesktopToastContainer .Header .Title{font-size:10.5px !important;font-weight:700 !important;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-accent) !important;}
-.DesktopToastContainer .Content{color:var(--sp-text) !important;}
+.DesktopToastContainer .Header .Title,.DesktopToastContainer .Middle:has(.GroupMessageBody) .Body::before,.DesktopToastContainer .Middle:has(.AchievementIconWrapper) .NameAndDesc::before{display:block;font-size:10px !important;line-height:12px !important;font-weight:700 !important;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-toast-c) !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.DesktopToastContainer .Middle:has(.GroupMessageBody) .Body::before{content:"Message";}
+.DesktopToastContainer .Middle:has(.AchievementIconWrapper) .NameAndDesc::before{content:"Succès débloqué";}
 .DesktopToastContainer .Content > div:nth-child(2){font-weight:800 !important;color:var(--sp-text) !important;}
 .DesktopToastContainer .Content > div:nth-child(n+3),.DesktopToastContainer .StandardNotificationSubText,.DesktopToastContainer .Desc{color:var(--sp-muted) !important;}
-.DesktopToastContainer .Middle::before{display:none !important;}
-.DesktopToastContainer .Panel > div:first-child > img{border-radius:50% !important;corner-shape:round !important;}
-.DesktopToastContainer .AvatarStatus{border-radius:2px;background:var(--sp-muted) !important;}
-.DesktopToastContainer .AvatarStatus.online{background:var(--sp-online) !important;}
-.DesktopToastContainer .AvatarStatus.ingame{background:var(--sp-accent) !important;}
-.DesktopToastContainer .Body > div:first-child,.DesktopToastContainer .NameAndDesc .Name{font-weight:800 !important;color:var(--sp-text) !important;}
-.DesktopToastContainer .GroupMessageBody{color:var(--sp-muted) !important;}
+.DesktopToastContainer .Body > div:first-child,.DesktopToastContainer .NameAndDesc .Name{font-weight:800 !important;color:var(--sp-text) !important;line-height:16px !important;}
+.DesktopToastContainer .GroupMessageBody{color:var(--sp-muted) !important;line-height:14px !important;}
 .DesktopToastContainer .FriendOnlineColor,.DesktopToastContainer .FriendGame,.DesktopToastContainer .FriendInGameAppColor{color:var(--sp-online) !important;}
-.DesktopToastContainer .ProgressBar{background:var(--sp-accent) !important;}
+.DesktopToastContainer .ProgressBar{background:var(--sp-toast-c) !important;}
 /* Raccourci musique de Steam dans la barre du haut : remplacé par notre lecteur */
 .TitleBarControls > .tool-tip-source:has(> .SoundtrackControls){display:none !important;}
 /* ---------- Composants natifs de Steam (Paramètres intégrés, Propriétés, dialogues) ---------- */

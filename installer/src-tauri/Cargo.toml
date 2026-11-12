@@ -1,6 +1,6 @@
 [package]
 name = "steam-upgraded-installeur"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 description = "Installeur de Steam Upgraded"
 
