@@ -16,6 +16,7 @@ import { AlbumPage } from './pages/Album';
 import { CapturesPage } from './pages/Captures';
 import { initSteamSettingsRedirect } from './features/steamSettings';
 import { initChatSkin } from './features/chatSkin';
+import { initToastSkin } from './features/toastSkin';
 import { initMediaRedirect } from './features/mediaRedirect';
 import { initUpdates } from './features/updates';
 import { BpHome } from './bigpicture/Home';
@@ -62,6 +63,7 @@ async function start() {
 	initHistory();
 	initSteamSettingsRedirect();
 	initChatSkin();
+	initToastSkin();
 	initMediaRedirect();
 	initUpdates();
 }
