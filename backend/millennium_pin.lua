@@ -55,6 +55,10 @@ function sp_millennium_lock(tag)
     return encode({ ok = true, lock = lock })
 end
 
+-- Les octets vérifiés ici sont jetés : Core_UpdateMillennium (3.6.2) retélécharge lui-même l'adresse, sans empreinte,
+-- et n'accepte pas de fichier local (voir installMillennium dans frontend/features/millennium.ts). Cette vérification
+-- prouve que l'adresse officielle sert bien l'archive testée juste avant que Millennium ne la télécharge à son tour.
+
 ---@ffi
 ---Télécharge une archive officielle de Millennium et vérifie son empreinte, avant de la confier à Millennium.
 ---@param url string

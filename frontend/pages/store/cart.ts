@@ -225,7 +225,7 @@ export function useCartDetails() {
 	const c = useCart();
 	const lines = c.cart?.lines || [];
 	const key = lines.map(cartKey).sort().join(',');
-	const [items] = useAsync(() => (lines.length ? loadCartItems(lines) : Promise.resolve(new Map<string, CartItem>())), [key]);
+	const [items] = useAsync(() => (lines.length ? loadCartItems(lines) : Promise.resolve(new Map<string, CartItem>())), [key], true);
 	const rows = lines.map((line) => ({ line, item: items.data?.get(cartKey(line)) }));
 	const known = rows.every((r) => r.item);
 	const sum = (f: (i: CartItem) => number | undefined) => rows.reduce((n, r) => n + (r.item ? f(r.item) ?? 0 : 0), 0);

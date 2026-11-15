@@ -128,8 +128,15 @@ impl Env {
         if let Some(flag) = self.sim_flag() {
             return fs::write(flag, b"").map_err(|e| e.to_string());
         }
+        // Installeur lancé en administrateur (conseillé après un accès refusé) : Steam, et les jeux qu'il lance, ne doivent
+        // pas hériter de ces droits. L'Explorateur de la session ouvre Steam avec les droits ordinaires de la personne.
         #[cfg(windows)]
-        let cmd = std::process::Command::new(steam.join("steam.exe")).current_dir(steam).spawn();
+        let cmd = if crate::system::is_elevated() {
+            let explorer = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows")).join("explorer.exe");
+            std::process::Command::new(explorer).arg(steam.join("steam.exe")).spawn()
+        } else {
+            std::process::Command::new(steam.join("steam.exe")).current_dir(steam).spawn()
+        };
         // macOS : par l'app lanceur, qui ouvre Steam avec Millennium (l'app Steam d'origine l'ouvrirait sans)
         #[cfg(target_os = "macos")]
         let cmd = {

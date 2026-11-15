@@ -63,6 +63,27 @@ local function price_to_cents(s)
     return tonumber(digits)
 end
 
+-- Prix d'origine d'une ligne de recherche, en centièmes comme data-price-final. Steam ne le donne qu'en texte, et ce
+-- texte n'a pas de décimales pour certaines devises (« ¥2,999 » pour 299900, « Rp 185 999 » pour 18599900) : l'échelle
+-- est celle du prix final affiché à côté (même format). Échelle inconnue : pas de prix d'origine.
+-- Promotion à 100 % : le prix final affiché est « Gratuit », sans chiffres. Le prix d'origine n'est gardé que s'il
+-- s'écrit avec des centimes (« 19,99€ », « $19.99 », « 1 049,--€ ») : déjà en centièmes, échelle 1.
+local function original_cents(row, final)
+    local orig_text = row:match('<div class="discount_original_price">(.-)</div>')
+    local orig = price_to_cents(orig_text)
+    if not orig or not final then return nil end
+    if final == 0 then
+        local t = orig_text:gsub("&#?%w+;", " ")
+        if t:match("[%.,]%d%d%D*$") or t:match("[%.,]%-%-%D*$") then return orig end
+        return nil
+    end
+    local shown = price_to_cents(row:match('<div class="discount_final_price">(.-)</div>'))
+    if not shown or shown == 0 then return nil end
+    local scale = final / shown
+    if scale ~= 1 and scale ~= 10 and scale ~= 100 then return nil end
+    return orig * scale
+end
+
 local function encode(t)
     local ok, out = pcall(cjson.encode, t)
     if ok then return out end
@@ -72,11 +93,20 @@ end
 -- ---------- Noms des tags (une fois par session du backend) ----------
 
 local tag_names = nil
+-- Échec retenu quelques minutes : sinon chaque ligne d'une recherche (jusqu'à 100) relancerait une requête de 25 s,
+-- et le backend ne traite rien d'autre pendant ce temps.
+local tag_names_failed_at = nil
+local TAG_NAMES_RETRY = 300 -- secondes
 
 local function get_tag_names()
     if tag_names then return tag_names end
+    if tag_names_failed_at and os.time() - tag_names_failed_at < TAG_NAMES_RETRY then return {} end
     local data = fetch_json("https://store.steampowered.com/tagdata/populartags/" .. LANG)
-    if type(data) ~= "table" then return {} end
+    if type(data) ~= "table" then
+        tag_names_failed_at = os.time()
+        return {}
+    end
+    tag_names_failed_at = nil
     tag_names = {}
     for _, t in ipairs(data) do
         if t.tagid and t.name then tag_names[tonumber(t.tagid)] = t.name end
@@ -186,7 +216,7 @@ local function parse_search_rows(html)
             r.capsule = row:match('<div class="search_capsule"><img src="([^"]+)"')
             r.discount = tonumber(row:match('data%-discount="(%d+)"') or "0")
             r.final = tonumber(row:match('data%-price%-final="(%d+)"') or "")
-            r.original = price_to_cents(row:match('<div class="discount_original_price">(.-)</div>')) or r.final
+            r.original = original_cents(row, r.final) or r.final
             local tip = row:match('search_review_summary[^"]*"%s+data%-tooltip%-html="(.-)"')
             if tip then
                 tip = decode_entities(tip)
@@ -255,7 +285,7 @@ end
 
 -- ---------- Liste de souhaits ----------
 
--- Repli si GetItems échoue : prix seuls, via appdetails (plusieurs ids passent avec ce filtre).
+-- Repli si un lot de GetItems échoue : prix seuls, via appdetails (plusieurs ids passent avec ce filtre).
 local function prices_from_appdetails(appids)
     local out = {}
     for i = 1, #appids, 50 do
@@ -304,9 +334,20 @@ function sp_store_wishlist(steamid)
     end
     local items, failed = get_items(ids, true)
     local source = "GetItems"
-    if failed and next(items) == nil then
-        items = prices_from_appdetails(ids)
-        source = "appdetails"
+    if failed then
+        -- Repli sur les seuls jeux absents (un lot de 100 a pu échouer seul)
+        local missing = {}
+        for _, id in ipairs(ids) do
+            if not items[id] then missing[#missing + 1] = id end
+        end
+        if #missing > 0 then
+            local got = false
+            for id, it in pairs(prices_from_appdetails(missing)) do
+                items[id] = it
+                got = true
+            end
+            if got then source = #missing == #ids and "appdetails" or "GetItems+appdetails" end
+        end
     end
     local out = {}
     for _, id in ipairs(ids) do

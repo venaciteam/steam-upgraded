@@ -7,7 +7,7 @@ import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { setSetting, useSettings } from '../core/settings';
 import { openSteamWeb } from '../core/steam';
 import { PLUGIN_ID, restartInterface, selfInfo } from './uninstall';
-import { PINNED, disableMillenniumSelfUpdate, installMillennium, installableAsset, matchesPinned, releaseLock, restartSteam, runningMillennium, useMillenniumState, refreshMillenniumState } from './millennium';
+import { PINNED, installMillennium, installableAsset, matchesPinned, releaseLock, restartSteam, runningMillennium, useMillenniumState, refreshMillenniumState } from './millennium';
 
 export type Release = { tag: string; version: string; name?: string; published?: string; url?: string; notes: string; star?: string; sha256?: string };
 
@@ -60,8 +60,7 @@ let started = false;
 export function initUpdates() {
 	if (started) return;
 	started = true;
-	// Millennium ne change de version qu'avec Steam Upgraded (voir millennium.ts)
-	disableMillenniumSelfUpdate();
+	// Les mises à jour automatiques de Millennium sont coupées dès le démarrage (index.tsx, voir millennium.ts)
 	setTimeout(checkForUpdate, 30_000);
 	setInterval(checkForUpdate, 6 * 3600_000);
 }
@@ -122,18 +121,23 @@ async function install(r: Release): Promise<void> {
 	const lock = await releaseLock(r.tag);
 	const d = parse(await backend.sp_update_install(me.path, r.star, r.sha256, me.version));
 	if (!d?.ok) throw new Error(d?.error || 'Mise à jour impossible.');
-	const run = await runningMillennium();
-	if (lock && run.version && !sameVersion(lock.version, run.version) && installableAsset(lock, run.platform)) {
-		try {
-			await installMillennium(lock);
-		} catch (e: any) {
-			await reloadPlugin();
-			throw new Error(`Steam Upgraded ${r.version} est installé, mais pas Millennium ${lock.version} : ${e?.message || e} Réessayez depuis la section Millennium.`);
+	// Le nouveau fichier est en place : quoi qu'il arrive ensuite, le plugin doit être relancé (ou Steam redémarré).
+	// Sinon un second essai garderait ce nouveau fichier comme « version précédente », sous l'ancien numéro.
+	let steamRestarts = false;
+	try {
+		const run = await runningMillennium();
+		if (lock && run.version && !sameVersion(lock.version, run.version) && installableAsset(lock, run.platform)) {
+			try {
+				await installMillennium(lock);
+			} catch (e: any) {
+				throw new Error(`Steam Upgraded ${r.version} est installé, mais pas Millennium ${lock.version} : ${e?.message || e} Réessayez depuis la section Millennium.`);
+			}
+			restartSteam();
+			steamRestarts = true;
 		}
-		restartSteam();
-		return;
+	} finally {
+		if (!steamRestarts) await reloadPlugin();
 	}
-	await reloadPlugin();
 }
 
 const sameVersion = (a: string, b: string) => a.replace(/^v/i, '') === b.replace(/^v/i, '');

@@ -1,6 +1,6 @@
 [package]
 name = "steam-upgraded-installeur"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 description = "Installeur de Steam Upgraded"
 
@@ -18,7 +18,7 @@ sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
-windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Security", "Win32_System_Threading"] }
 
 # macOS : Millennium est une archive .tar.gz (millennium/build-macos.sh)
 [target.'cfg(target_os = "macos")'.dependencies]

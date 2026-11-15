@@ -1,7 +1,7 @@
 // Big Picture › Magasin › Liste de souhaits : toute la liste en grille de quatre, filtres rapides.
 // A ouvre notre page de vente, X ajoute au panier (ou ouvre le panier si le jeu y est), Y change le tri.
 // Le retrait de la liste se fait depuis la page de vente (Y), comme l'ajout.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { DialogButton, Focusable } from 'millennium';
 import { Deal, int, loadWishlist, money, mySteamId, Owned, ownershipMap, plural, useAsync } from '../pages/store/data';
 import { addToCart, lineFor, useCart } from '../pages/store/cart';
@@ -25,11 +25,19 @@ function WishCard({ d, rank, owned, focus }: { d: Deal; rank: number; owned?: Ow
 	const note = wishNote(d, owned);
 	const family = owned?.kind === 'family' ? owned.member : null;
 	const buyable = canBuy(d) && owned?.kind !== 'me';
+	// Un second X avant le rendu suivant ne doit pas ajouter le jeu deux fois
+	const pending = useRef(false);
 	const add = async () => {
 		if (inCart) return bpNavigate(ROUTES.bpCart);
+		if (pending.current) return;
+		pending.current = true;
 		setBusy(true);
-		setFailed(!(await addToCart(d)));
-		setBusy(false);
+		try {
+			setFailed(!(await addToCart(d)));
+		} finally {
+			pending.current = false;
+			setBusy(false);
+		}
 	};
 	const name = d.name || `Jeu ${d.appid}`;
 	return (

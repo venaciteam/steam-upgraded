@@ -57,7 +57,7 @@ function Message({ title, children, action }: { title: string; children?: any; a
 
 // ---------- Fenêtre ----------
 
-export function ArtworkDialog({ app, provider, onClose }: { app: any; provider: Provider; onClose: () => void }) {
+export function ArtworkDialog({ app, provider, onClose, onBusy }: { app: any; provider: Provider; onClose: () => void; onBusy?: (busy: boolean) => void }) {
 	const settings = useSettings();
 	const hasKey = provider.hasKey();
 	const appid: number = app.appid;
@@ -83,6 +83,11 @@ export function ArtworkDialog({ app, provider, onClose }: { app: any; provider: 
 	const [custom, setCustom] = useState<Partial<Record<SlotId, string | null>>>({});
 	const [busy, setBusy] = useState<string | null>(null);
 	const [notice, setNotice] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null);
+	// B de la manette (Big Picture) est lu hors de React : il doit savoir qu'une application est en cours
+	// Corps entre accolades : onBusy renvoie une valeur que React prendrait pour une fonction de nettoyage
+	useEffect(() => {
+		onBusy?.(!!busy);
+	}, [!!busy]);
 
 	const rootRef = useRef<HTMLDivElement>(null);
 	const fileRef = useRef<HTMLInputElement>(null);
@@ -121,6 +126,9 @@ export function ArtworkDialog({ app, provider, onClose }: { app: any; provider: 
 
 	// Résultats pour l'emplacement et les filtres courants
 	const queryKey = game.data ? `${game.data.id}|${slotId}|${style}|${animated ? 1 : 0}|${tick}` : '';
+	// clé affichée en ce moment (lue au retour d'un « Afficher plus » : l'emplacement a pu changer entre-temps)
+	const shownKey = useRef(queryKey);
+	shownKey.current = queryKey;
 	useEffect(() => {
 		if (!game.data) return undefined;
 		const cached = cache.current.get(queryKey);
@@ -145,14 +153,16 @@ export function ArtworkDialog({ app, provider, onClose }: { app: any; provider: 
 	async function loadMore() {
 		const cur = results.data;
 		if (!cur || !game.data || moreLoading) return;
+		const key = queryKey;
 		setMoreLoading(true);
 		try {
 			const next = await provider.assets(slotId, game.data.id, style ? [style] : [], animated, cur.page + 1);
 			const merged = { ...next, items: [...cur.items, ...next.items] };
-			cache.current.set(queryKey, merged);
-			setResults({ state: 'ready', data: merged });
+			cache.current.set(key, merged);
+			// emplacement ou filtre changé pendant le chargement : ces visuels ne vont pas avec l'emplacement affiché
+			if (shownKey.current === key) setResults({ state: 'ready', data: merged });
 		} catch (e: any) {
-			setNotice({ kind: 'error', text: e.message });
+			if (shownKey.current === key) setNotice({ kind: 'error', text: e.message });
 		} finally {
 			setMoreLoading(false);
 		}

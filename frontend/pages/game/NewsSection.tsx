@@ -1,7 +1,7 @@
 // Section « Mises à jour » au bas de la fiche d'un jeu et de sa page de vente (bureau) : historique des notes de mise à
 // jour publiées sur Steam, ou toutes les actualités du jeu. La plus récente est dépliée ; chaque note se lit sur place.
 import { useEffect, useState } from 'react';
-import { BB_CSS, BBCode, bbPlain, openLink } from '../../core/bbcode';
+import { BB_CSS, BBCode, bbPlain, blockAuxClick, openLink } from '../../core/bbcode';
 import { newsAgo, newsDate, newsKind, newsPageUrl, NewsFilter, NewsItem, useAppNews } from './news';
 
 const CSS = `
@@ -111,6 +111,8 @@ function NewsRow({ it, open, onToggle }: { it: NewsItem; open: boolean; onToggle
 										e.preventDefault();
 										openLink(it.url);
 									}}
+									onAuxClick={blockAuxClick}
+									onMouseDown={blockAuxClick}
 								>
 									Voir sur Steam
 								</a>

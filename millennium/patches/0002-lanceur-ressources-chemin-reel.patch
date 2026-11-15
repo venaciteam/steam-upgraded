@@ -1,0 +1,27 @@
+Steam Upgraded : ressources du lanceur cherchées aussi à côté de l'exécutable réel.
+
+Ouverte par le Finder (LaunchServices), l'app lanceur voit le chemin réel de son exécutable
+(~/Library/Application Support/Millennium/runtime/<version>/steam_osx) au lieu du lien de Contents/MacOS :
+le seul emplacement prévu, ../Resources/millennium-assets, n'existe pas et le lanceur s'arrête
+(« Failed to prepare macOS bootstrap assets »). Millennium : licence MIT (voir ../LICENSE-Millennium.md).
+
+Appliqué par millennium/build-macos.sh (git apply) après 0001. Tout ce qui précède la première ligne « diff --git » est ignoré.
+
+diff --git a/src/bootstrap/macos/steam_launcher.cc b/src/bootstrap/macos/steam_launcher.cc
+index 0f3a2d8..9911b84 100644
+--- a/src/bootstrap/macos/steam_launcher.cc
++++ b/src/bootstrap/macos/steam_launcher.cc
+@@ -322,6 +322,13 @@ static bool resolve_bootstrap_asset_sources(const char* wrapper_directory, std::
+     }
+ 
+     candidates.emplace_back(std::filesystem::path(wrapper_directory) / ".." / "Resources" / "millennium-assets");
++    /* Steam Upgraded : lancée par le Finder, l'app voit le chemin réel de son exécutable (runtime/<version>/steam_osx, et non
++       le lien de Contents/MacOS) ; les ressources sont alors à côté de lui, dans runtime/<version>/millennium-assets. */
++    candidates.emplace_back(std::filesystem::path(wrapper_directory) / "millennium-assets");
++    char real_executable[PATH_MAX];
++    if (get_executable_path(real_executable, sizeof(real_executable))) {
++        candidates.emplace_back(std::filesystem::path(real_executable).parent_path() / "millennium-assets");
++    }
+ 
+     for (const std::filesystem::path& candidate : candidates) {
+         std::error_code canonical_error;

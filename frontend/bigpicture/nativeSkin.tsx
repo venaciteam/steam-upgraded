@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { findClassModule } from 'millennium';
 import { usePath } from '../core/history';
+import { watchClassAliases } from '../core/classAliases';
 import { useArt } from '../core/art';
 import { getSettings, onSettings, useSettings } from '../core/settings';
 import { tokens } from '../core/theme';
@@ -424,6 +425,8 @@ function paint() {
 	watchPowerMenu(main.document);
 	for (const win of sideWindows()) {
 		try {
+			// macOS : noms de classes lisibles (Millennium ne les pose pas, et ces fenêtres manquent à g_PopupManager)
+			watchClassAliases(win.document);
 			ensureStyle(win.document, 'spbp-native', v + POPUP_CSS + POWER_CSS);
 			watchPowerMenu(win.document);
 			win.document.documentElement.classList.toggle('spbp-squircle', s.forme === 'squircle');

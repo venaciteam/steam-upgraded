@@ -132,11 +132,11 @@ export const realProvider: Provider = {
 	},
 	async apply(appid, slot, img) {
 		await w.SteamClient.Apps.SetCustomArtworkForApp(appid, img.base64, img.format, slot.asset);
-		notifyArtChanged();
+		notifyArtChanged(appid);
 	},
 	async clear(appid, slot) {
 		await w.SteamClient.Apps.ClearCustomArtworkForApp(appid, slot.asset);
-		notifyArtChanged();
+		notifyArtChanged(appid);
 	},
 };
 

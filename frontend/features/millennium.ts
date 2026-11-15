@@ -37,6 +37,13 @@ export function installableAsset(lock: MillenniumLock, platform: Platform): Mill
  * Coupe les mises à jour automatiques de Millennium (« Rechercher les mises à jour » et « À la mise à jour : installer »).
  * Par défaut, Millennium installe lui-même ses nouvelles versions au démarrage de Steam, ce qui casserait le figeage.
  * Prend effet au prochain démarrage de Steam (la vérification de Millennium a lieu avant le chargement du plugin).
+ *
+ * Limite de Millennium 3.6.2 : aucune méthode n'écrit une seule clé de sa configuration ; Core_SetBackendConfig la
+ * remplace entière, réglages des plugins compris (même config.json). La configuration est donc lue juste avant
+ * l'écriture et seuls les deux drapeaux changent, mais une écriture arrivée entre la lecture et l'écriture
+ * (pluginConfig.set de ce plugin ou d'un autre) serait perdue. Cela n'arrive qu'une fois par installation (ensuite les
+ * drapeaux sont déjà posés et rien n'est réécrit) ; le risque est le plus faible en appelant cette fonction au tout
+ * début du démarrage, avant toute écriture de réglages.
  */
 export async function disableMillenniumSelfUpdate(): Promise<boolean> {
 	try {
@@ -51,6 +58,33 @@ export async function disableMillenniumSelfUpdate(): Promise<boolean> {
 	} catch (e) {
 		console.error('[steam-upgraded] réglage des mises à jour de Millennium', e);
 		return false;
+	}
+}
+
+/**
+ * Désinstallation en gardant Millennium : rend ses mises à jour automatiques, avec ses valeurs par défaut de la 3.6.2
+ * (rechercher : oui ; à la mise à jour : installer sous Windows, prévenir ailleurs). Seulement si les drapeaux valent
+ * encore ce que Steam Upgraded y a mis : un choix fait depuis dans Millennium est gardé. Même limite d'écriture que
+ * disableMillenniumSelfUpdate.
+ */
+export async function restoreMillenniumSelfUpdate(): Promise<void> {
+	try {
+		const cfg = parse(await core('Core_GetBackendConfig'));
+		const g = cfg?.general;
+		if (!g || typeof g !== 'object') return;
+		let changed = false;
+		if (g.checkForMillenniumUpdates === false) {
+			g.checkForMillenniumUpdates = true;
+			changed = true;
+		}
+		if (g.onMillenniumUpdate === 0) {
+			const { platform } = await runningMillennium();
+			g.onMillenniumUpdate = platform === 'windows' ? 2 : 1;
+			changed = true;
+		}
+		if (changed) await core('Core_SetBackendConfig', { config: JSON.stringify(cfg) });
+	} catch (e) {
+		console.error('[steam-upgraded] mises à jour de Millennium non rendues à la désinstallation', e);
 	}
 }
 
@@ -71,6 +105,10 @@ export async function installMillennium(lock: MillenniumLock): Promise<void> {
 	if (!asset) throw new Error(`Millennium ${lock.version} ne peut pas être installé depuis Steam sur ce système.`);
 	const v = parse(await backend.sp_millennium_verify(asset.url, asset.sha256));
 	if (!v?.ok) throw new Error(v?.error || 'Vérification de Millennium impossible.');
+	// Limite connue : Core_UpdateMillennium (3.6.2) ne prend qu'une adresse, qu'il retélécharge sans vérifier d'empreinte ;
+	// il n'installe pas un fichier local (une adresse file:// échoue sur son contrôle du code HTTP). L'archive vérifiée
+	// ci-dessus n'est donc pas celle qui est installée : seule garantie, la même adresse officielle (HTTPS, publication
+	// étiquetée de Millennium) téléchargée quelques secondes plus tard. Rien ne doit s'intercaler entre les deux appels.
 	await core('Core_UpdateMillennium', { downloadUrl: asset.url, downloadSize: asset.size, background: true });
 	for (let i = 0; i < 240; i++) {
 		await new Promise((r) => setTimeout(r, 500));

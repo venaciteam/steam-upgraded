@@ -27,13 +27,19 @@ function bpHistory(): any {
 /** Page d'accueil du magasin web (avec ou sans paramètres). */
 const STORE_FRONT = /^https:\/\/store\.steampowered\.com\/?([?#].*)?$/;
 
+/** Page web de Valve ouverte à l'instant par un de nos boutons (openSteamWeb) : jamais redirigée. */
+function isOurWebOpen(state: any): boolean {
+	const url = String(state?.strURL || '');
+	return !!url && ourWebOpen.url === url && Date.now() - ourWebOpen.at < 3000;
+}
+
 function desktopRedirect(pathname: string, state: any): string | null {
 	const s = getSettings();
 	if (s.replaceLibrary && (pathname === '/library' || pathname === '/library/home')) return ROUTES.library;
 	// « Magasin » du menu de la barre d'état (steam://store) ouvre l'accueil web du magasin : notre Magasin,
 	// sauf quand c'est notre bouton « Tout le magasin Steam » qui l'a demandé
 	const url = String(state?.strURL || '');
-	if (s.replaceLibrary && pathname.startsWith('/browser') && STORE_FRONT.test(url) && !(ourWebOpen.url === url && Date.now() - ourWebOpen.at < 3000)) return ROUTES.store;
+	if (s.replaceLibrary && pathname.startsWith('/browser') && STORE_FRONT.test(url) && !isOurWebOpen(state)) return ROUTES.store;
 	// une collection (jeux masqués, bandes-son, collections de l'utilisateur) : notre bibliothèque sur cette vue
 	const coll = pathname.match(/^\/library\/collection\/([^/]+)/);
 	if (s.replaceLibrary && coll) {
@@ -137,8 +143,9 @@ function attach(kind: Kind, history: any) {
 		let to: string | null;
 		if (kind === 'desktop') {
 			// À l'ouverture de la fenêtre, Steam affiche sa page d'accueil web (/browser), parfois après nous :
-			// on la remplace pendant les premières secondes de chaque nouvelle fenêtre.
-			const opening = Date.now() - attachedAt < 20000 && loc.pathname.startsWith('/browser') && getSettings().replaceLibrary;
+			// on la remplace pendant les premières secondes de chaque nouvelle fenêtre, sauf une page ouverte par
+			// nos boutons (Communauté, profil, « Payer sur Steam »…).
+			const opening = Date.now() - attachedAt < 20000 && loc.pathname.startsWith('/browser') && getSettings().replaceLibrary && !isOurWebOpen(loc.state);
 			to = opening ? ROUTES.library : desktopRedirect(loc.pathname, loc.state);
 		} else to = bpRedirect(loc.pathname);
 		if (to && to !== loc.pathname) {

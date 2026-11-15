@@ -132,6 +132,15 @@ export function initClassAliases() {
 	w.g_PopupManager?.AddPopupCreatedCallback?.((p: any) => setTimeout(() => watch(p.window?.document), 0));
 }
 
+/**
+ * Fenêtre absente de g_PopupManager (menu Steam, accès rapide, notifications de Big Picture) : y poser aussi les noms
+ * lisibles. Sans effet quand Millennium les pose lui-même (Windows, Linux) ou avant initClassAliases.
+ */
+export function watchClassAliases(doc: Document | null | undefined) {
+	if (native || !req || !map.size) return;
+	watch(doc);
+}
+
 /** Pour le diagnostic : vrai si nos alias tournent (macOS), faux si Millennium s'en charge. */
 export function classAliasesActive(): boolean {
 	return !native && docs.size > 0;

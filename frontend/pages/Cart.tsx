@@ -1,7 +1,7 @@
 // Panier (/steamupgraded/panier), ouvert depuis le Magasin et la liste de souhaits.
 // Articles du panier du compte (lus par le client Steam, voir store/cart.ts), retrait d'un article ou de tous,
 // récapitulatif ; « Payer sur Steam » ouvre la page de Valve, où se fait le paiement.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { navigate, openSteamWeb, openStorePage, playerName, ROUTES } from '../core/steam';
 import { usePageTransition } from '../core/transitions';
 import { CartItem, int, loadWishlist, money, mySteamId, Owned, ownershipMap, plural, useAsync, wishlistOnSale } from './store/data';
@@ -73,7 +73,9 @@ function Line({ line, item, owned }: { line: CartLine; item?: CartItem; owned?: 
 
 /** Souhaits en promo absents du panier : ajout en un clic. */
 function MoreDeals({ deals }: { deals: Deal[] }) {
-	const [busy, setBusy] = useState(0);
+	// jeux en cours d'ajout (un par carte : un second clic pendant l'ajout ne l'envoie pas deux fois)
+	const [busy, setBusy] = useState<ReadonlySet<number>>(() => new Set());
+	const adding = useRef(new Set<number>());
 	if (!deals.length) return null;
 	return (
 		<>
@@ -97,13 +99,19 @@ function MoreDeals({ deals }: { deals: Deal[] }) {
 							<button
 								type="button"
 								className="sp-btn spc-icon"
-								disabled={busy === d.appid}
+								disabled={busy.has(d.appid)}
 								aria-label={`Ajouter ${d.name || 'ce jeu'} au panier`}
 								title="Ajouter au panier"
 								onClick={async () => {
-									setBusy(d.appid);
-									await addToCart(d);
-									setBusy(0);
+									if (adding.current.has(d.appid)) return;
+									adding.current.add(d.appid);
+									setBusy(new Set(adding.current));
+									try {
+										await addToCart(d);
+									} finally {
+										adding.current.delete(d.appid);
+										setBusy(new Set(adding.current));
+									}
 								}}
 							>
 								<IconPlus />

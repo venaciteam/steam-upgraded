@@ -3,7 +3,7 @@
 # (Windows : .exe ; macOS : app zippée Steam-Upgraded-macOS.zip).
 # Usage : bash installer/build.sh   (SU_STAR_READY=1 : garde le .star déjà présent dans installer/payload/, sans recompiler le plugin)
 # Simulation (rien ne touche le vrai Steam) : "installer/dist/Installer Steam Upgraded <version>.exe" --simulation [vierge|ancien|installe|sans-steam|erreur-reseau|steam-bloque]
-set -e
+set -eo pipefail
 cd "$(dirname "$0")/.."
 
 V_PLUGIN=$(grep -m1 '^version' millennium.toml | cut -d'"' -f2)
@@ -16,7 +16,13 @@ fi
 
 # Verrou : pas deux compilations du plugin en même temps.
 LOCK=.reload.lock
-for i in $(seq 1 150); do mkdir "$LOCK" 2>/dev/null && break; sleep 2; done
+GOT_LOCK=
+for i in $(seq 1 150); do mkdir "$LOCK" 2>/dev/null && { GOT_LOCK=1; break; }; sleep 2; done
+if [ -z "$GOT_LOCK" ]; then
+  # Jamais toucher au verrou d'un autre processus : arrêt avant de poser le trap qui le retire.
+  echo "Verrou $LOCK toujours pris après 5 minutes (autre compilation en cours, ou verrou orphelin à retirer à la main)."
+  exit 1
+fi
 BACKEND_COPY=$(mktemp -d)
 # Rien ne doit échouer ici : sans plugin à compiler (SU_STAR_READY=1), aucune copie du backend n'a été faite.
 trap '[ -d "$BACKEND_COPY/backend" ] && cp -rf "$BACKEND_COPY/backend/." backend/ 2>/dev/null; rm -rf "$BACKEND_COPY"; rmdir "$LOCK" 2>/dev/null; true' EXIT
@@ -36,7 +42,7 @@ find backend -name '*.lua' -print0 | xargs -0 node installer/tools/lua-ascii.mjs
 node node_modules/@steambrew/starlight/bin/starlight.js pack --release -o installer/payload 2>&1 | tail -1
 cp -rf "$BACKEND_COPY/backend/." backend/
 fi
-(cd installer/src-tauri && cargo build --release)
+(cd installer/src-tauri && cargo build --release --features tauri/custom-protocol)
 
 if [ "$(uname)" = "Darwin" ]; then
   # macOS : app « Installer Steam Upgraded », zippée. Non signée ni notarisée (choix assumé) : signature ad hoc seulement,

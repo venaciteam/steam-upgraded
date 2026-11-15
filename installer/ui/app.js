@@ -361,7 +361,7 @@ async function startOperation() {
   } catch (e) {
     setBusy(false);
     screen.dataset.shown = '';
-    showError(String(e));
+    showError(e);
   }
 }
 
@@ -384,24 +384,32 @@ function showDone() {
     <div class="body center">
       <span class="big rd" aria-hidden="true">${ICON.bigOk}</span>
       <h1 class="h1">${st.mode === 'repair' ? 'Steam Upgraded est réparé' : 'Steam Upgraded est installé'}</h1>
-      <p class="p">Steam redémarre avec sa nouvelle interface.${withKey ? ' La clé SteamGridDB est enregistrée : sur la fiche d\'un jeu, l\'icône « Personnaliser les visuels » ouvre le choix des jaquettes, bannières et logos.' : ''}</p>
+      <p class="p">${st.steps.find((s) => s.id === 'relancer')?.state === 'skip' ? 'Steam n\'a pas pu être relancé automatiquement : ouvrez-le pour découvrir sa nouvelle interface.' : 'Steam redémarre avec sa nouvelle interface.'}${withKey ? ' La clé SteamGridDB est enregistrée : sur la fiche d\'un jeu, l\'icône « Personnaliser les visuels » ouvre le choix des jaquettes, bannières et logos.' : ''}</p>
       ${st.det.platform === 'macos' ? `<div class="note"><b>Sur Mac, ouvrez désormais Steam avec l'app « Steam Upgraded »</b>, dans le dossier Applications : c'est elle qui charge Steam Upgraded. L'app Steam d'origine ouvre Steam sans. Pensez à la mettre dans le Dock à la place de Steam.</div>` : ''}
       <div class="note">Pour le retirer plus tard : Paramètres › Mises à jour › Désinstaller, dans Steam, ou relancez cet installeur.</div>
     </div>
     <div class="foot"><span class="sp"></span><button type="button" class="btn-p" id="end">Terminer</button></div>`, (r) => on(r, '#end', () => win.close()));
 }
 
-function showError(message) {
+// `err` : texte, ou { message, notRestored } renvoyé par install / uninstall (notRestored : fichiers qui n'ont pas pu
+// être remis en place).
+function showError(err) {
   screen.dataset.name = 'erreur';
+  const message = typeof err === 'string' ? err : String(err?.message ?? err);
+  const notRestored = Array.isArray(err?.notRestored) ? err.notRestored : [];
   const failed = st.steps.find((s) => s.state === 'err');
   if (!failed && st.steps.length) { st.steps[0].state = 'err'; st.steps[0].detail = message; }
   st.steps.forEach((s) => { if (s.state === 'run') s.state = 'wait'; });
   const title = st.mode === 'uninstall' ? 'La désinstallation n\'a pas pu se terminer' : 'L\'installation n\'a pas pu se terminer';
+  const relaunched = st.wasRunning && st.steps.find((s) => s.id === 'fermer')?.state === 'ok';
+  const note = notRestored.length
+    ? `<div class="note" role="alert"><b>${notRestored.length > 1 ? `${notRestored.length} fichiers n'ont pas pu être remis en place` : 'Un fichier n\'a pas pu être remis en place'}</b> : ${esc(notRestored.slice(0, 3).join(' ; '))}${notRestored.length > 3 ? ' ; …' : ''}. Steam Upgraded ou Millennium peuvent ne plus fonctionner : réessayez, et gardez la liste complète avec « Copier le détail ».${relaunched ? ' Steam a été relancé.' : ''}</div>`
+    : `<div class="note"><b>Rien n'a été modifié.</b>${relaunched ? ' Steam a été relancé tel qu\'il était.' : ''}</div>`;
   render(`
     <div class="body tight">
       <h1 class="h1 sm">${title}</h1>
       <div class="list compact">${stepsHtml()}</div>
-      <div class="note"><b>Rien n'a été modifié.</b>${st.wasRunning && st.steps.find((s) => s.id === 'fermer')?.state === 'ok' ? ' Steam a été relancé tel qu\'il était.' : ''}</div>
+      ${note}
     </div>
     <div class="foot">
       <button type="button" class="btn-g" id="copy">Copier le détail</button>
@@ -410,7 +418,7 @@ function showError(message) {
       <button type="button" class="btn-p" id="retry">Réessayer</button>
     </div>`, (r) => {
     on(r, '#copy', async () => {
-      const lines = [`Steam Upgraded ${st.det?.version} — ${title}`, ...st.steps.map((s) => `${s.state.toUpperCase()}  ${s.label}${s.detail ? ' : ' + s.detail : ''}`)];
+      const lines = [`Steam Upgraded ${st.det?.version} — ${title}`, ...st.steps.map((s) => `${s.state.toUpperCase()}  ${s.label}${s.detail ? ' : ' + s.detail : ''}`), ...notRestored.map((f) => `NON REMIS EN PLACE  ${f}`)];
       try { await navigator.clipboard.writeText(lines.join('\n')); r.querySelector('#copy').textContent = 'Détail copié'; } catch { /* presse-papiers indisponible */ }
     });
     on(r, '#quit', () => win.close());
