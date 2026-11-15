@@ -41,12 +41,60 @@ local function read_file(path)
     return data
 end
 
+-- Écriture directe sur le fichier, vérifiée (écriture, fermeture, relecture identique).
+local function write_in_place(path, data)
+    local f = io.open(path, "wb")
+    if not f then return false end
+    local ok = f:write(data)
+    local closed = f:close()
+    return ok and closed and read_file(path) == data
+end
+
+-- Écriture sûre : le contenu complet va d'abord dans « <path>.tmp » (écriture et fermeture vérifiées, fichier relu et
+-- comparé), puis remplace le fichier. Un disque plein, un Steam fermé ou une coupure pendant l'écriture laissent donc
+-- l'ancien fichier intact. Millennium ne charge que les fichiers en « .star » : ni le .tmp ni le .old.
 local function write_file(path, data)
-    local f, err = io.open(path, "wb")
+    local tmp, old = path .. ".tmp", path .. ".old"
+    local f, err = io.open(tmp, "wb")
     if not f then return false, err end
     local ok, werr = f:write(data)
-    f:close()
-    if not ok then return false, werr end
+    local closed, cerr = f:close()
+    if not ok or not closed then
+        os.remove(tmp)
+        return false, werr or cerr or "écriture impossible"
+    end
+    if read_file(tmp) ~= data then
+        os.remove(tmp)
+        return false, "fichier écrit incomplet"
+    end
+    -- macOS, Linux : le renommage remplace le fichier d'un coup.
+    if os.rename(tmp, path) then return true end
+    -- Windows : le renommage n'écrase pas un fichier existant. L'ancien est d'abord mis de côté, puis remis en place
+    -- si le nouveau ne peut pas prendre sa place.
+    local existing = io.open(path, "rb")
+    if existing then existing:close() end
+    if existing then
+        os.remove(old)
+        local moved, merr = os.rename(path, old)
+        if not moved then
+            -- Fichier ouvert sans partage en suppression (le .star chargé par Millennium) : il ne se déplace pas mais
+            -- s'écrit encore sur place, comme avant l'écriture par .tmp. Les données ont déjà été vérifiées dans le .tmp ;
+            -- si l'écriture sur place ou sa relecture échoue, l'ancien contenu est réécrit. Ancien fichier illisible :
+            -- refus, faute de pouvoir le remettre.
+            os.remove(tmp)
+            local before = read_file(path)
+            if before and write_in_place(path, data) then return true end
+            if before then write_in_place(path, before) end
+            return false, merr or "remplacement impossible"
+        end
+    end
+    local renamed, rerr = os.rename(tmp, path)
+    if not renamed then
+        if existing then os.rename(old, path) end
+        os.remove(tmp)
+        return false, rerr or "remplacement impossible"
+    end
+    if existing then os.remove(old) end
     return true
 end
 
@@ -148,7 +196,8 @@ function sp_update_install(path, url, hash, current)
 
     local wrote, werr = write_file(path, data)
     if not wrote then
-        write_file(path, old)
+        -- write_file laisse l'ancien fichier en place ; dernier recours si même sa remise en place a échoué
+        if read_file(path) ~= old then write_file(path, old) end
         return fail("Remplacement du plugin impossible (" .. tostring(werr) .. "). La version actuelle est remise en place.")
     end
     note_installed_version(path, url:match("/download/v(%d+%.%d+%.%d+)/"))
@@ -182,7 +231,7 @@ function sp_update_rollback(path)
     local current = read_file(path)
     local wrote, werr = write_file(path, data)
     if not wrote then
-        if current then write_file(path, current) end
+        if current and read_file(path) ~= current then write_file(path, current) end
         return fail("Remplacement du plugin impossible (" .. tostring(werr) .. ").")
     end
     local mok, meta = pcall(cjson.decode, read_file(prev_json) or "")

@@ -67,7 +67,7 @@ export function buildCss(s: Settings): string {
 	const p3 = s.hdrWide
 		? `@media (color-gamut: p3){:root{--sp-accent:color(display-p3 ${(r / 255).toFixed(3)} ${(g / 255).toFixed(3)} ${(b / 255).toFixed(3)});}}`
 		: '';
-	const squircle = s.forme === 'squircle' ? `.sp-root,.sp-root *,.sp-topnav,.sp-topnav *,.sp-pop,.sp-pop *,.contextMenu,.contextMenuItem,.DownloadsPage .Section,.DownloadsPage .SectionItem,.DownloadsPage .DialogButton,.sp-steamset *,.DesktopUI .AppProperties *,.DesktopUI .GenericDialogBase,.DesktopUI .GenericDialogBase *,.DesktopUI .InstallRequestModal,.DesktopUI .InstallRequestModal *,.DesktopUI .EulaModalDialog,.DesktopUI .EulaModalDialog *,.DesktopToastContainer .Middle,.DesktopToastContainer .AppLogo *{corner-shape:squircle;}` : '';
+	const squircle = s.forme === 'squircle' ? `.sp-root,.sp-root *,.sp-topnav,.sp-topnav *,.sp-pop,.sp-pop *,.contextMenu,.contextMenuItem,.DownloadsPage .Section,.DownloadsPage .SectionItem,.DownloadsPage .DialogButton,.sp-steamset *,.DesktopUI .AppProperties *,.DesktopUI .GenericDialogBase,.DesktopUI .GenericDialogBase *,.DesktopUI .InstallRequestModal,.DesktopUI .InstallRequestModal *,.DesktopUI .EulaModalDialog,.DesktopUI .EulaModalDialog *,.DesktopToastContainer .DesktopToastPopup,.DesktopToastContainer .AppLogo *,.DesktopToastContainer .StandardLogoDimensions:has(> svg){corner-shape:squircle;}` : '';
 	const hdrImages = s.hdrWide ? `.sp-root img{dynamic-range-limit:${s.hdrHalo ? 'no-limit' : 'constrained'};}` : '';
 	return `
 :root{${vars}}
@@ -416,11 +416,11 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopToastContainer{background:transparent !important;overflow:hidden;}
 .DesktopToastContainer *{font-family:var(--sp-font) !important;}
 .DesktopToastContainer > div{height:100vh;}
-.DesktopToastContainer .Middle{--sp-toast-c:var(--sp-accent);position:relative;box-sizing:border-box;height:100vh !important;overflow:hidden;background:var(--sp-surface) !important;border:1px solid var(--sp-line);border-radius:var(--sp-r-lg);}
-.DesktopToastContainer .Middle:has(.GroupMessageBody,.AvatarStatus,.FriendOnlineColor,.FriendInGameAppColor){--sp-toast-c:var(--sp-online);}
-.DesktopToastContainer .Middle:has(.AchievementIconWrapper){--sp-toast-c:var(--sp-trophy);}
-.DesktopToastContainer .Middle::before{display:none !important;}
-.DesktopToastContainer .Middle::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sp-toast-c);z-index:2;}
+.DesktopToastContainer .DesktopToastPopup{--sp-toast-c:var(--sp-accent);position:relative;box-sizing:border-box;height:100vh !important;overflow:hidden;background:var(--sp-surface) !important;border:1px solid var(--sp-line);border-radius:var(--sp-r-lg);}
+.DesktopToastContainer .DesktopToastPopup:has(.GroupMessageBody,.AvatarStatus,.FriendOnlineColor,.FriendInGameAppColor){--sp-toast-c:var(--sp-online);}
+.DesktopToastContainer .DesktopToastPopup:has(.AchievementIconWrapper){--sp-toast-c:var(--sp-trophy);}
+.DesktopToastContainer .DesktopToastPopup::before{display:none !important;}
+.DesktopToastContainer .DesktopToastPopup::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sp-toast-c);z-index:2;}
 .DesktopToastContainer .DesktopToastBackground{display:block !important;position:absolute !important;left:0 !important;top:0 !important;bottom:0 !important;width:60% !important;height:auto !important;background:var(--sp-toast-img, none) center/cover no-repeat !important;filter:blur(16px) saturate(1.4) !important;opacity:.5 !important;transform:scale(1.3) !important;transform-origin:left center;-webkit-mask-image:linear-gradient(90deg,#000 15%,transparent 85%);mask-image:linear-gradient(90deg,#000 15%,transparent 85%);z-index:0;pointer-events:none;}
 .DesktopToastContainer .DesktopToastBackground > *{display:none !important;}
 .DesktopToastContainer .Panel{position:relative;z-index:1;box-sizing:border-box;height:100% !important;background:transparent !important;}
@@ -432,15 +432,23 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopToastContainer .Content{color:var(--sp-text) !important;display:flex !important;flex-direction:column;justify-content:center;align-self:stretch;margin-top:0 !important;margin-bottom:0 !important;}
 .DesktopToastContainer .AchievementTextSection{justify-content:center !important;}
 .DesktopToastContainer .Header .Icon{display:none !important;}
-.DesktopToastContainer .Header .Title,.DesktopToastContainer .Middle:has(.GroupMessageBody) .Body::before,.DesktopToastContainer .Middle:has(.AchievementIconWrapper) .NameAndDesc::before{display:block;font-size:10px !important;line-height:12px !important;font-weight:700 !important;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-toast-c) !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.DesktopToastContainer .Middle:has(.GroupMessageBody) .Body::before{content:"Message";}
-.DesktopToastContainer .Middle:has(.AchievementIconWrapper) .NameAndDesc::before{content:"Succès débloqué";}
+.DesktopToastContainer .Header .Title,.DesktopToastContainer .DesktopToastPopup:has(.GroupMessageBody) .Body::before,.DesktopToastContainer .DesktopToastPopup:has(.AchievementIconWrapper) .NameAndDesc::before{display:block;font-size:10px !important;line-height:12px !important;font-weight:700 !important;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-toast-c) !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.DesktopToastContainer .DesktopToastPopup:has(.GroupMessageBody) .Body::before{content:"Message";}
+.DesktopToastContainer .DesktopToastPopup:has(.AchievementIconWrapper) .NameAndDesc::before{content:"Succès débloqué";}
 .DesktopToastContainer .Content > div:nth-child(2){font-weight:800 !important;color:var(--sp-text) !important;}
 .DesktopToastContainer .Content > div:nth-child(n+3),.DesktopToastContainer .StandardNotificationSubText,.DesktopToastContainer .Desc{color:var(--sp-muted) !important;}
 .DesktopToastContainer .Body > div:first-child,.DesktopToastContainer .NameAndDesc .Name{font-weight:800 !important;color:var(--sp-text) !important;line-height:16px !important;}
 .DesktopToastContainer .GroupMessageBody{color:var(--sp-muted) !important;line-height:14px !important;}
 .DesktopToastContainer .FriendOnlineColor,.DesktopToastContainer .FriendGame,.DesktopToastContainer .FriendInGameAppColor{color:var(--sp-online) !important;}
 .DesktopToastContainer .ProgressBar{background:var(--sp-toast-c) !important;}
+/* Certaines notifications (manette connectée ou déconnectée…) passent par une enveloppe sans hauteur : sans elle, le
+   height:100% de la carte ne tient plus et la ligne reste collée en haut de la fenêtre. */
+.DesktopToastContainer .SteamNotificationWrapper{height:100%;}
+/* Logo dessiné par Steam (SVG, ex. la manette) : tuile comme une icône de jeu, pictogramme centré de la couleur du type
+   (Steam lui donne un padding qui le décale), halo de cette couleur à la place de l'image floutée. */
+.DesktopToastContainer .StandardLogoDimensions:has(> svg){display:flex;align-items:center;justify-content:center;box-sizing:border-box;background:var(--sp-surface2);border:1px solid var(--sp-line);border-radius:10px;}
+.DesktopToastContainer .StandardLogoDimensions > svg{display:block;box-sizing:border-box;width:28px !important;height:28px !important;padding:0 !important;margin:0 !important;color:var(--sp-toast-c);}
+.DesktopToastContainer .DesktopToastPopup:has(.StandardLogoDimensions > svg) .DesktopToastBackground{background:radial-gradient(circle at 38px 50%,var(--sp-toast-c) 0,transparent 56px) !important;}
 /* Raccourci musique de Steam dans la barre du haut : remplacé par notre lecteur */
 .TitleBarControls > .tool-tip-source:has(> .SoundtrackControls){display:none !important;}
 /* ---------- Composants natifs de Steam (Paramètres intégrés, Propriétés, dialogues) ---------- */

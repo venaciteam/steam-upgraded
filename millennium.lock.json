@@ -12,8 +12,8 @@
 		"sha256": "95bda40184dd6437da1668060ec5961c762f3c1e59923f53380e43d4e720f359"
 	},
 	"macos": {
-		"url": "https://github.com/venaciteam/steam-upgraded/releases/download/v0.2.0/millennium-v3.6.2-macos-arm64.tar.gz",
-		"size": 3382644,
-		"sha256": "3b0834d706151b23657fca7456b7a0bfcd6a3221980a2fed757b73d8b8ff9c14"
+		"url": "https://github.com/venaciteam/steam-upgraded/releases/download/v0.2.7/millennium-v3.6.2-macos-arm64.tar.gz",
+		"size": 3382840,
+		"sha256": "b09f330465c3d0a91f1989d594e032e376e444984dfcabc71a27acab1bbd01ac"
 	}
 }

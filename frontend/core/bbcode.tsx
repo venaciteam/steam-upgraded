@@ -63,16 +63,34 @@ function imageUrl(u: string): string {
 	return /^https:\/\//i.test(s) ? s : '';
 }
 
+/**
+ * Adresses steam:// acceptées dans le texte d'un éditeur : celles qui ouvrent une page (magasin, communauté).
+ * Les autres (run, rungameid, install, uninstall, validate, open…) lanceraient une action dans Steam : ce ne sont
+ * pas des liens. `steam://openurl/<adresse>` est ramené à son adresse web.
+ */
+const SAFE_STEAM = /^steam:\/\/(url\/[a-z]+(\/|$)|store\/\d+\/?$|advertise\/\d+\/?$)/i;
+
 function linkUrl(u: string): string {
-	const s = u.trim().replace(/^\/\//, 'https://');
-	return /^(https?:|steam:)/i.test(s) ? s : '';
+	let s = u.trim().replace(/^\/\//, 'https://');
+	const inner = /^steam:\/\/openurl\/(https?:\/\/.+)$/i.exec(s);
+	if (inner) s = inner[1];
+	if (/^https?:\/\//i.test(s)) return s;
+	return SAFE_STEAM.test(s) ? s : '';
 }
 
 /** Lien : pages de Steam dans Steam, le reste dans le navigateur du système. */
 export function openLink(url: string) {
-	if (/^steam:/i.test(url)) return w.SteamClient?.URL?.ExecuteSteamURL?.(url);
+	if (/^steam:/i.test(url)) return SAFE_STEAM.test(url) ? w.SteamClient?.URL?.ExecuteSteamURL?.(url) : undefined;
+	if (!/^https?:\/\//i.test(url)) return undefined;
 	if (/^https?:\/\/([a-z0-9-]+\.)*(steampowered|steamcommunity)\.com\//i.test(url)) return openSteamWeb(url);
 	w.SteamClient?.System?.OpenInSystemBrowser?.(url);
+}
+
+/** Clic du milieu sur un lien : neutralisé (Chromium ouvrirait l'adresse lui-même, hors de openLink). */
+export function blockAuxClick(e: { button: number; preventDefault: () => void; stopPropagation: () => void }) {
+	if (e.button !== 1) return;
+	e.preventDefault();
+	e.stopPropagation();
 }
 
 function plain(n: Node | string): string {
@@ -168,6 +186,8 @@ function render(n: Node | string, key: string): ReactNode {
 						e.stopPropagation();
 						openLink(href);
 					}}
+					onAuxClick={blockAuxClick}
+					onMouseDown={blockAuxClick}
 				>
 					{n.children.length ? kids() : href}
 				</a>
@@ -182,7 +202,7 @@ function render(n: Node | string, key: string): ReactNode {
 			if (!/^[\w-]{6,20}$/.test(id)) return null;
 			const href = `https://www.youtube.com/watch?v=${id}`;
 			return (
-				<a key={key} href={href} className="bb-link bb-video" onClick={(e) => (e.preventDefault(), e.stopPropagation(), openLink(href))}>
+				<a key={key} href={href} className="bb-link bb-video" onClick={(e) => (e.preventDefault(), e.stopPropagation(), openLink(href))} onAuxClick={blockAuxClick} onMouseDown={blockAuxClick}>
 					Vidéo YouTube
 				</a>
 			);

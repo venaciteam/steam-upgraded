@@ -66,11 +66,19 @@ pub fn write_marker(steam: &Path, marker: &Marker, backup: &mut Backup) -> Resul
 }
 
 fn read_config(steam: &Path) -> Result<Value, String> {
-    let path = config_path(steam);
-    match fs::read_to_string(&path) {
+    read_config_at(&config_path(steam))
+}
+
+fn read_config_at(path: &Path) -> Result<Value, String> {
+    match fs::read_to_string(path) {
         Ok(text) => serde_json::from_str(text.trim_start_matches('\u{feff}'))
             .map_err(|_| format!("La configuration de Millennium est illisible ({}).", path.display())),
-        Err(_) => Ok(json!({})),
+        // Pas encore de configuration (Millennium jamais lancé) : elle sera créée.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(json!({})),
+        // Toute autre erreur (droits, texte qui n'est pas de l'UTF-8…) : surtout ne pas la remplacer par une configuration
+        // vide, les réglages de Millennium, des autres plugins et des thèmes seraient perdus.
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Err(crate::millennium::explain_io(path, e)),
+        Err(e) => Err(format!("La configuration de Millennium est illisible ({}, {e}).", path.display())),
     }
 }
 
@@ -196,11 +204,104 @@ pub fn uninstall(steam: &Path, backup: &mut Backup) -> Result<(), String> {
         }
         plugins.remove(ID);
     }
+    release_millennium_updates(&mut cfg);
     write_config(steam, &cfg, backup)
+}
+
+/// Rend à Millennium ses mises à jour automatiques, coupées par `enable` : les valeurs posées par Steam Upgraded sont
+/// retirées, et Millennium remet les siennes par défaut à son démarrage suivant (`merge_default_config` de la 3.6.2 :
+/// vérification active, installation automatique sous Windows, simple avis ailleurs). Une valeur changée depuis est gardée.
+fn release_millennium_updates(cfg: &mut Value) {
+    if let Some(general) = cfg.get_mut("general").and_then(Value::as_object_mut) {
+        if general.get("checkForMillenniumUpdates") == Some(&json!(false)) {
+            general.remove("checkForMillenniumUpdates");
+        }
+        if general.get("onMillenniumUpdate") == Some(&json!(0)) {
+            general.remove("onMillenniumUpdate");
+        }
+    }
 }
 
 fn write_config(steam: &Path, cfg: &Value, backup: &mut Backup) -> Result<(), String> {
     let path = config_path(steam);
     let text = serde_json::to_string_pretty(cfg).unwrap();
     backup.write(&path, text.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("su-test-plugin-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn configuration_absente_vide_mais_illisible_refusee() {
+        let dir = temp_dir("lecture");
+        assert_eq!(read_config_at(&dir.join("absente.json")).unwrap(), json!({}));
+        let bad = dir.join("latin1.json");
+        fs::write(&bad, b"{ \"general\": { \"accentColor\": \"caf\xe9\" } }").unwrap();
+        assert!(read_config_at(&bad).is_err(), "UTF-8 invalide : erreur, jamais une configuration vide");
+        let good = dir.join("ok.json");
+        fs::write(&good, "\u{feff}{ \"themes\": { \"activeTheme\": \"x\" } }").unwrap();
+        assert_eq!(read_config_at(&good).unwrap()["themes"]["activeTheme"], "x");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn mises_a_jour_de_millennium_rendues() {
+        let mut cfg = json!({ "general": { "checkForMillenniumUpdates": false, "onMillenniumUpdate": 0, "accentColor": "x" } });
+        release_millennium_updates(&mut cfg);
+        assert_eq!(cfg, json!({ "general": { "accentColor": "x" } }));
+        // Réglage choisi depuis dans Millennium : gardé
+        let mut cfg = json!({ "general": { "checkForMillenniumUpdates": true, "onMillenniumUpdate": 1 } });
+        release_millennium_updates(&mut cfg);
+        assert_eq!(cfg, json!({ "general": { "checkForMillenniumUpdates": true, "onMillenniumUpdate": 1 } }));
+        let mut cfg = json!({ "plugins": {} });
+        release_millennium_updates(&mut cfg);
+        assert_eq!(cfg, json!({ "plugins": {} }));
+    }
+
+    /// Installation puis désinstallation dans un faux dossier Steam : seuls le plugin et ses réglages partent, et
+    /// Millennium retrouve ses mises à jour.
+    #[cfg(windows)]
+    #[test]
+    fn desinstallation_rend_la_configuration() {
+        let _lock = crate::millennium::tests::BACKUP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let steam = temp_dir("desinstallation");
+        let cfg_path = config_path(&steam);
+        let before = json!({ "general": { "accentColor": "x" }, "plugins": { "enabledPlugins": ["autre"], "autre": { "config": { "a": 1 } } } });
+        fs::create_dir_all(cfg_path.parent().unwrap()).unwrap();
+        fs::write(&cfg_path, before.to_string()).unwrap();
+        let mut backup = Backup::new();
+        copy(&steam, &mut backup).unwrap();
+        enable(&steam, Some("cle"), false, &mut backup).unwrap();
+        assert_eq!(read_config(&steam).unwrap()["general"]["onMillenniumUpdate"], 0);
+        uninstall(&steam, &mut backup).unwrap();
+        assert_eq!(read_config(&steam).unwrap(), before);
+        assert!(!plugins_dir(&steam).join(STAR_NAME).exists());
+        drop(backup);
+        let _ = fs::remove_dir_all(&steam);
+    }
+
+    /// Configuration illisible : l'installation échoue sans la réécrire.
+    #[cfg(windows)]
+    #[test]
+    fn configuration_illisible_jamais_reecrite() {
+        let _lock = crate::millennium::tests::BACKUP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let steam = temp_dir("illisible");
+        let cfg_path = config_path(&steam);
+        fs::create_dir_all(cfg_path.parent().unwrap()).unwrap();
+        let original: &[u8] = b"{ \"themes\": { \"activeTheme\": \"th\xe8me\" } }";
+        fs::write(&cfg_path, original).unwrap();
+        let mut backup = Backup::new();
+        assert!(enable(&steam, None, false, &mut backup).is_err());
+        assert_eq!(fs::read(&cfg_path).unwrap(), original);
+        drop(backup);
+        let _ = fs::remove_dir_all(&steam);
+    }
 }

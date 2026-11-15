@@ -3,6 +3,7 @@
 // dans Millennium (son backend s'arrête), puis interface rechargée sans nous. Millennium reste installé.
 import { useState } from 'react';
 import { UpdateSections } from './updates';
+import { restoreMillenniumSelfUpdate } from './millennium';
 
 const w = window as any;
 export const PLUGIN_ID = 'com.venacity.steamupgraded';
@@ -28,6 +29,8 @@ export async function uninstallPlugin(keepSettings: boolean): Promise<void> {
 	// Le fichier d'abord : s'il ne part pas, le plugin reste en place avec tous ses réglages
 	const removed = parse(await backend.sp_remove_plugin_file(me.path));
 	if (!removed?.ok) throw new Error(removed?.error || 'Le fichier du plugin n’a pas pu être supprimé.');
+	// Millennium reste installé : il retrouve ses mises à jour automatiques
+	await restoreMillenniumSelfUpdate();
 	if (!keepSettings) {
 		try {
 			const r = parse(await core('PluginConfig_DeleteAll', { plugin_name: PLUGIN_ID }));

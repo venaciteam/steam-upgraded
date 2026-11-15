@@ -30,10 +30,46 @@ for p in "$HERE"/patches/*.patch; do
   echo "   $(basename "$p")"
 done
 
+echo "→ Chemins de la machine retirés des fichiers compilés"
+# Les compilateurs écrivent les chemins des sources dans les binaires (__FILE__, messages d'erreur des crates Rust) : le
+# dossier personnel devient /home et le dossier de compilation /build (le dernier préfixe qui correspond l'emporte).
+H=$(cd "$HOME" && pwd -P)
+R=$(cd "$WORK" && pwd -P)
+case "$H$R" in *[[:space:]]*) echo "Chemin avec une espace ($H, $R) : impossible à passer aux compilateurs."; exit 1 ;; esac
+if echo 'int x;' | "${CC:-cc}" -ffile-prefix-map=/a=/b -x c -c - -o /dev/null 2>/dev/null; then
+  MAP="-ffile-prefix-map=$H=/home -ffile-prefix-map=$R=/build"
+else
+  MAP="-fdebug-prefix-map=$H=/home -fdebug-prefix-map=$R=/build -fmacro-prefix-map=$H=/home -fmacro-prefix-map=$R=/build"
+fi
+# Lus par cmake à la première configuration (le dossier de compilation est neuf), dépendances de _deps comprises
+for v in CFLAGS CXXFLAGS OBJCFLAGS OBJCXXFLAGS; do export "$v=${!v:+${!v} }$MAP"; done
+# Éditeur de liens : chemins des .o et des archives écrits dans la table des symboles (entrées OSO de débogage, que
+# -ffile-prefix-map ne touche pas) rendus relatifs au dossier de compilation
+export LDFLAGS="${LDFLAGS:+$LDFLAGS }-Wl,-oso_prefix,$R/"
+# Rust (corrosion) : à la suite des options déjà présentes ; cargo ignore RUSTFLAGS quand CARGO_ENCODED_RUSTFLAGS existe
+if [ -n "${CARGO_ENCODED_RUSTFLAGS:-}" ]; then
+  export CARGO_ENCODED_RUSTFLAGS="$CARGO_ENCODED_RUSTFLAGS"$'\x1f'"--remap-path-prefix=$H=/home"$'\x1f'"--remap-path-prefix=$R=/build"
+else
+  export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$H=/home --remap-path-prefix=$R=/build"
+fi
+# Le chargeur (src/typescript/sdk/rollup.config.js) écrit l'adresse absolue de sa carte des sources
+# (file:///<dossier de compilation>/…/millennium.js.map), copiée dans les fichiers livrés et dans libmillennium.dylib :
+# adresse relative à la place (la carte n'est pas livrée).
+node -e '
+const fs = require("fs"), f = process.argv[1], s = fs.readFileSync(f, "utf8");
+const avant = "sourceMappingURL=file:///${absMapPath}", apres = "sourceMappingURL=${path.basename(absMapPath)}";
+if (!s.includes(avant)) { console.error("   adresse de la carte des sources introuvable dans " + f); process.exit(1); }
+fs.writeFileSync(f, s.replace(avant, apres));
+' "$WORK/src/typescript/sdk/rollup.config.js"
+# steam_osx garde en dur la racine des sources (MILLENNIUM_ROOT, repli « dev » qui lit les fichiers du chargeur dans
+# les sources quand ils manquent à côté du binaire) : racine fictive /build à la place, absente des Mac des utilisateurs.
+echo "   $H -> /home, $R -> /build, objets liés, racine des sources de steam_osx, carte des sources du chargeur"
+
 echo "→ Compilation (plusieurs minutes)"
 (
   cd "$WORK"
-  cmake --preset=osx-release -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" -DMILLENNIUM_RUN_TESTS_ON_BUILD=OFF >"$HERE/build/configure.log" 2>&1 \
+  cmake --preset=osx-release -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" -DMILLENNIUM_RUN_TESTS_ON_BUILD=OFF \
+    -DMILLENNIUM_REPO_ROOT=/build >"$HERE/build/configure.log" 2>&1 \
     || { tail -20 "$HERE/build/configure.log"; exit 1; }
   cmake --build build/osx-release -- -j"$(sysctl -n hw.ncpu)" >"$HERE/build/build.log" 2>&1 \
     || { grep -E "error|FAILED" "$HERE/build/build.log" | head -20; exit 1; }
@@ -72,7 +108,18 @@ Non signée et non notarisée par Apple.
 EOF
 
 mkdir -p "$OUT"
-( cd "$HERE/build" && COPYFILE_DISABLE=1 tar --no-xattrs -czf "$OUT/$NAME.tar.gz" "$NAME" )
+# Propriétaire neutre (root:wheel) : sans cela, chaque en-tête tar porte le nom du compte qui a fabriqué l'archive
+# (uname/gname). Options de bsdtar depuis libarchive 3.0.
+( cd "$HERE/build" && COPYFILE_DISABLE=1 tar --no-xattrs --uid 0 --gid 0 --uname root --gname wheel -czf "$OUT/$NAME.tar.gz" "$NAME" )
+# Contrôle anti-fuite des fichiers de l'archive, quand l'outil est présent (il n'est pas publié)
+if [ -f "$HERE/../tools/verifier-fuite.mjs" ]; then
+  echo "→ Contrôle anti-fuite"
+  node "$HERE/../tools/verifier-fuite.mjs" "$OUT/$NAME.tar.gz" || {
+    rm -f "$OUT/$NAME.tar.gz" "$OUT/$NAME.sha256"
+    echo "Archive retirée : données personnelles ou chemins locaux (ci-dessus). Le contenu reste dans $PKG pour examen."
+    exit 1
+  }
+fi
 SHA=$(shasum -a 256 "$OUT/$NAME.tar.gz" | cut -d' ' -f1)
 SIZE=$(stat -f %z "$OUT/$NAME.tar.gz")
 echo "$SHA  $NAME.tar.gz" >"$OUT/$NAME.sha256"

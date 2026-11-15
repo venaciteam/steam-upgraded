@@ -9,7 +9,7 @@ import { Provider, realProvider, SLOTS } from './api';
 
 const w = window as any;
 
-let current: { root: any; host: HTMLElement; stopPad?: () => void } | null = null;
+let current: { root: any; host: HTMLElement; stopPad?: () => void; busy?: boolean } | null = null;
 
 function closeDialog() {
 	if (!current) return;
@@ -47,10 +47,12 @@ function mount(app: any, provider: Provider, targetDoc?: Document) {
 	host.id = 'sp-sgdb-dialog';
 	doc.body.appendChild(host);
 	const root = ReactDOM.createRoot(host);
-	current = { root, host };
-	root.render(<ArtworkDialog app={target} provider={provider} onClose={closeDialog} />);
-	// Dans Big Picture, la fenêtre se pilote aussi à la manette
-	if (doc.body.classList.contains('GamepadUIPopupWindowBody')) current.stopPad = padNavigate(host, closeDialog);
+	const entry: NonNullable<typeof current> = { root, host };
+	current = entry;
+	root.render(<ArtworkDialog app={target} provider={provider} onClose={closeDialog} onBusy={(b) => (entry.busy = b)} />);
+	// Dans Big Picture, la fenêtre se pilote aussi à la manette ; B ne la ferme pas pendant une application
+	// (comme Échap, Annuler et le clic sur le fond) : le message en bas de la fenêtre dit où elle en est
+	if (doc.body.classList.contains('GamepadUIPopupWindowBody')) entry.stopPad = padNavigate(host, () => !entry.busy && closeDialog());
 }
 
 /** Ouvre la fenêtre « Personnaliser les visuels » pour un jeu (objet app ou appid).
@@ -76,5 +78,5 @@ export async function resetArtwork(app: any) {
 	} catch (e) {
 		console.error('[steam-upgraded] restauration de la position du logo impossible', e);
 	}
-	notifyArtChanged();
+	notifyArtChanged(target.appid);
 }

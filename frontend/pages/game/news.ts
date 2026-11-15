@@ -1,6 +1,6 @@
 // Mises à jour et actualités d'un jeu (événements de sa page communautaire, backend.sp_app_news), partagées par la fiche
 // et la page de vente, au bureau comme en Big Picture. Gardées le temps de la session (10 min).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type NewsItem = {
 	gid: string;
@@ -69,6 +69,9 @@ export function useAppNews(appid: number, filter: NewsFilter, enabled = true): N
 	const key = `${appid}:${filter}`;
 	const [state, set] = useState<{ key: string; entry: Entry | null; loading: boolean; error: string }>(() => ({ key, entry: cache.get(key) || null, loading: false, error: '' }));
 	const [tick, setTick] = useState(0);
+	// clé affichée en ce moment : un « Afficher plus » qui revient après un changement de filtre ou de jeu n'écrit rien
+	const shownKey = useRef(key);
+	shownKey.current = key;
 
 	const load = (from: Entry | null, want: number) => {
 		let alive = true;
@@ -76,11 +79,11 @@ export function useAppNews(appid: number, filter: NewsFilter, enabled = true): N
 		grow(appid, filter, from || { items: [], nextOffset: 0, more: true, at: 0 }, want)
 			.then((e) => {
 				cache.set(key, e);
-				if (alive) set({ key, entry: e, loading: false, error: '' });
+				if (alive && shownKey.current === key) set({ key, entry: e, loading: false, error: '' });
 			})
 			.catch((err) => {
 				console.error('[steam-upgraded] actualités du jeu indisponibles', appid, err);
-				if (alive) set((s) => ({ ...s, key, loading: false, error: String(err?.message || err) }));
+				if (alive && shownKey.current === key) set((s) => ({ ...s, key, loading: false, error: String(err?.message || err) }));
 			});
 		return () => {
 			alive = false;

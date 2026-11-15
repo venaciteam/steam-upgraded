@@ -38,7 +38,9 @@ function playersOn(c: Copy, use: CopyUse): string {
 	return on.length ? `${namesList(on)} ${on.length > 1 ? 'y jouent' : 'y joue'}` : '';
 }
 
-function chooseCopy(appid: number, copies: Copy[], use: CopyUse, onChanged: () => void) {
+const COPY_ERROR = "Steam n'a pas pu changer de copie. Réessayez dans un instant.";
+
+function chooseCopy(appid: number, copies: Copy[], use: CopyUse, onChanged: () => void, onError: (text: string) => void) {
 	const ordered = [...copies].sort((a, b) => Number(b.preferred) - Number(a.preferred) || Number(b.isMe) - Number(a.isMe) || a.name.localeCompare(b.name, 'fr'));
 	showBpMenu(
 		<Menu label="Copie à utiliser">
@@ -47,10 +49,16 @@ function chooseCopy(appid: number, copies: Copy[], use: CopyUse, onChanged: () =
 					key={c.accountId}
 					onSelected={async () => {
 						if (c.preferred) return;
-						const ok = await setPreferredCopy(appid, c.accountId);
-						if (ok) {
+						onError('');
+						try {
+							const ok = await setPreferredCopy(appid, c.accountId);
+							if (!ok) return onError(COPY_ERROR);
 							forgetOwners(appid);
 							onChanged();
+						} catch (e) {
+							// pas de réponse de Steam (délai dépassé) : même message qu'au bureau
+							console.error('[steam-upgraded] changement de copie impossible', appid, e);
+							onError(COPY_ERROR);
 						}
 					}}
 				>
@@ -91,6 +99,8 @@ export function BpGame() {
 	const appid = lastAppid.current;
 	const { app, details } = useGame(appid);
 	const [version, setVersion] = useState(0);
+	// échec du dernier changement de copie (gardé pour ce jeu seulement)
+	const [copyError, setCopyError] = useState<{ appid: number; text: string } | null>(null);
 	const copies = useLenders(appid, version);
 	const ach = useAchievements(appid);
 	const friends = useFriendsWithGame(appid);
@@ -138,7 +148,7 @@ export function BpGame() {
 	const fade = oled
 		? 'linear-gradient(to right, rgba(0,0,0,.72) 0%, rgba(0,0,0,0) 65%)'
 		: 'linear-gradient(to bottom, transparent 45%, var(--sp-bg) 100%), linear-gradient(to right, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 60%)';
-	const changeCopy = several ? () => chooseCopy(appid, copies!, use, () => setVersion((v) => v + 1)) : undefined;
+	const changeCopy = several ? () => chooseCopy(appid, copies!, use, () => setVersion((v) => v + 1), (text) => setCopyError(text ? { appid, text } : null)) : undefined;
 
 	return (
 		<BpFrame
@@ -211,6 +221,7 @@ export function BpGame() {
 								<span style={{ fontSize: 24, fontWeight: 800 }}>{copyName(used)}</span>
 								<span style={{ fontSize: 17, color: 'var(--sp-muted)' }}>{several ? `${plural(copies!.length - 1, 'autre', 'autres')} dans la famille` : 'Seule copie'}</span>
 								{playingNote && <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--sp-online)' }}>{playingNote}</span>}
+								{copyError?.appid === appid && <span role="status" style={{ fontSize: 17, fontWeight: 700, color: 'var(--sp-busy)' }}>{copyError.text}</span>}
 							</span>
 						</span>
 					) : (

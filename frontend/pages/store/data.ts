@@ -68,11 +68,34 @@ let currency = 'EUR';
 let moneyFormat: Intl.NumberFormat | null = null;
 let ready: Promise<void> | null = null;
 
+/** Attente maximale du réglage du pays avant de charger le magasin quand même (France et euro). */
+const READY_TIMEOUT = 4000;
+
+// Pays changé par une réponse tardive (après READY_TIMEOUT) : les hooks du magasin abonnés relisent leurs données,
+// déjà chargées dans l'ancienne devise.
+let regionVersion = 0;
+const regionListeners = new Set<() => void>();
+
+function useRegionVersion(): number {
+	const [version, setVersion] = useState(regionVersion);
+	useEffect(() => {
+		const update = () => setVersion(regionVersion);
+		regionListeners.add(update);
+		update(); // changement survenu entre le rendu et l'abonnement
+		return () => {
+			regionListeners.delete(update);
+		};
+	}, []);
+	return version;
+}
+
 /** Règle une fois le pays du magasin (celui de l'utilisateur pour Steam) et lit sa devise, avant le premier appel.
- * Sans réponse, le magasin reste celui de la France, en euros (voir backend/store.lua). */
+ * Sans réponse, le magasin reste celui de la France, en euros (voir backend/store.lua) ; au-delà de READY_TIMEOUT,
+ * le magasin se charge sans attendre (une réponse tardive règle encore le pays pour les chargements suivants). */
 export function storeReady(): Promise<void> {
-	if (!ready)
-		ready = (async () => {
+	if (!ready) {
+		let late = false;
+		const work = (async () => {
 			try {
 				// Développement : localStorage « steamupgraded:storeCountry » (ex. CH) force un autre pays pour tester sa devise
 				let forced = '';
@@ -83,12 +106,21 @@ export function storeReady(): Promise<void> {
 				const raw: any = await backend.sp_store_set_country(String(cc || ''));
 				const d = typeof raw === 'string' ? JSON.parse(raw) : raw;
 				if (d?.cc && d?.currency) {
+					// réponse tardive qui change de pays : les données déjà lues sont dans l'ancienne devise
+					const changed = late && (d.cc !== country || d.currency !== currency);
+					if (changed) cache.clear();
 					country = d.cc;
 					currency = d.currency;
 					moneyFormat = null;
+					if (changed) {
+						regionVersion++;
+						for (const update of regionListeners) update();
+					}
 				}
 			} catch {}
 		})();
+		ready = Promise.race([work, new Promise<void>((resolve) => setTimeout(() => ((late = true), resolve()), READY_TIMEOUT))]);
+	}
 	return ready;
 }
 
@@ -99,6 +131,7 @@ export function storeCountry(): string {
 
 /** Pays et devise du magasin, une fois réglés (France et euro en attendant). */
 export function useStoreRegion(): { country: string; currency: string; countryName: string; currencyName: string } {
+	useRegionVersion();
 	const [, setTick] = useState(0);
 	useEffect(() => {
 		let alive = true;
@@ -341,21 +374,31 @@ export function mySteamId(): string {
 
 export type Async<T> = { data?: T; error?: string; loading: boolean };
 
-export function useAsync<T>(load: (force: boolean) => Promise<T>, deps: any[]): [Async<T>, () => void] {
-	const [state, setState] = useState<Async<T>>({ loading: true });
+/**
+ * Charge `load` à chaque changement de `deps` (et à chaque appel de la fonction renvoyée, qui force la relecture).
+ * Quand `deps` change, le résultat précédent n'est plus rendu (une autre page de vente afficherait l'ancien jeu) ;
+ * `keepStale` le garde jusqu'au nouveau résultat, pour des données que l'appelant relit par clé (articles du panier).
+ * Une relecture forcée garde toujours l'ancien résultat affiché.
+ */
+export function useAsync<T>(load: (force: boolean) => Promise<T>, deps: any[], keepStale = false): [Async<T>, () => void] {
+	// Changement de pays tardif : relecture (cache déjà vidé), ancien résultat masqué comme pour un changement de `deps`
+	const region = useRegionVersion();
+	const depKey = JSON.stringify([...deps, region]);
+	const [state, setState] = useState<Async<T> & { key?: string }>({ loading: true });
 	const [nonce, setNonce] = useState(0);
 	useEffect(() => {
 		let alive = true;
 		setState((s) => ({ ...s, loading: true, error: undefined }));
 		load(nonce > 0)
-			.then((data) => alive && setState({ data, loading: false }))
-			.catch((e) => alive && setState({ error: String(e?.message || e), loading: false }));
+			.then((data) => alive && setState({ data, loading: false, key: depKey }))
+			.catch((e) => alive && setState({ error: String(e?.message || e), loading: false, key: depKey }));
 		return () => {
 			alive = false;
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [...deps, nonce]);
-	return [state, () => setNonce((n) => n + 1)];
+	}, [...deps, nonce, region]);
+	const current = keepStale || state.key === undefined || state.key === depKey;
+	return [current ? state : { loading: true }, () => setNonce((n) => n + 1)];
 }
 
 // ---------- Promos du moment (pages de 100, communes au bureau et à Big Picture) ----------
@@ -366,12 +409,17 @@ export function useSpecials(want: number, force: number) {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string>();
 	const appliedForce = useRef(0);
+	const region = useRegionVersion();
+	const appliedRegion = useRef(region);
 
 	useEffect(() => {
 		let alive = true;
 		// Actualisation demandée : on ignore le cache pour toutes les pages, sinon on le réutilise
 		const refresh = force !== appliedForce.current;
 		appliedForce.current = force;
+		// Changement de pays tardif : les pages affichées sont dans l'ancienne devise, la liste repart de zéro
+		if (region !== appliedRegion.current) setPages([]);
+		appliedRegion.current = region;
 		setLoading(true);
 		setError(undefined);
 		(async () => {
@@ -396,7 +444,7 @@ export function useSpecials(want: number, force: number) {
 		return () => {
 			alive = false;
 		};
-	}, [want, force]);
+	}, [want, force, region]);
 
 	const total = pages[0]?.total || 0;
 	const deals = useMemo(() => {

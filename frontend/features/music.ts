@@ -119,11 +119,15 @@ export const Repeat = { None: 0, All: 1, Once: 2 } as const;
 
 export type Playback = { appid: number; track: number; status: number; repeat: number; shuffle: boolean; volume: number; lengthMs: number };
 
-let store: any;
+let store: any = null;
+let lastSearch = 0;
 
-/** Magasin de lecture de Steam (celui de son propre lecteur). */
+/** Magasin de lecture de Steam (celui de son propre lecteur). Seul un magasin trouvé est gardé : le module de Steam
+ * peut se charger après le premier appel (nouvelle recherche toutes les 5 s au plus, elle parcourt tous les modules). */
 function musicStore(): any {
-	if (store !== undefined) return store;
+	if (store) return store;
+	if (Date.now() - lastSearch < 5000) return null;
+	lastSearch = Date.now();
 	try {
 		store = findModuleExport((e: any) => e && typeof e === 'object' && typeof e.updatePlaybackState === 'function' && 'currentActiveTrack' in e) || null;
 	} catch {

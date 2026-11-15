@@ -81,9 +81,12 @@ pub struct Release {
 }
 
 fn client() -> reqwest::Client {
+    // Pas de délai total : il couvrirait aussi la lecture de l'archive et ferait échouer toute connexion lente. Un délai
+    // pour se connecter, puis un délai d'inactivité, remis à zéro à chaque morceau reçu.
     reqwest::Client::builder()
         .user_agent(UA)
-        .timeout(std::time::Duration::from_secs(60))
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .read_timeout(std::time::Duration::from_secs(60))
         .build()
         .expect("client HTTP")
 }
@@ -197,17 +200,28 @@ impl Backup {
         fs::remove_file(dest).map_err(|e| explain_io(dest, e))
     }
 
-    pub fn restore(&mut self) {
+    /// Remet tout en place ; renvoie ce qui n'a pas pu l'être (chemin et raison), vide si tout est revenu.
+    pub fn restore(&mut self) -> Vec<String> {
+        let mut failed = vec![];
         for (dest, saved) in self.entries.drain(..).rev() {
-            match saved {
+            let res = match saved {
                 Some(copy) => {
-                    let _ = fs::copy(&copy, &dest);
+                    if let Some(parent) = dest.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
+                    fs::copy(&copy, &dest).map(|_| ())
                 }
-                None => {
-                    let _ = fs::remove_file(&dest);
-                }
+                // Fichier qui n'existait pas avant : à retirer, sauf si son écriture n'a jamais eu lieu
+                None => match fs::remove_file(&dest) {
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                    r => r,
+                },
+            };
+            if let Err(e) = res {
+                failed.push(format!("{} ({e})", dest.display()));
             }
         }
+        failed
     }
 }
 
@@ -217,6 +231,13 @@ impl Drop for Backup {
             let _ = fs::remove_dir_all(dir);
         }
     }
+}
+
+/// Vrai pour un chemin strictement relatif et descendant (ni absolu, ni lecteur, ni racine, ni « .. ») : seuls ceux-là,
+/// lus dans les notes de l'installeur, peuvent être supprimés à la désinstallation.
+pub fn is_safe_relative(rel: &str) -> bool {
+    let path = Path::new(rel);
+    !rel.is_empty() && !path.is_absolute() && path.components().all(|c| matches!(c, std::path::Component::Normal(_)))
 }
 
 pub fn explain_io(path: &Path, e: std::io::Error) -> String {
@@ -336,6 +357,8 @@ pub struct MacInstall {
     new_runtime: Option<PathBuf>,
     /// Runtime de même étiquette déjà présent (réparation) : (emplacement, copie mise de côté)
     replaced_runtime: Option<(PathBuf, PathBuf)>,
+    /// Vrai dès que runtime/current a été retiré pour pointer sur le nouveau runtime : seul ce cas est à défaire.
+    current_replaced: bool,
     previous_current: Option<PathBuf>,
     launcher_backup: Option<PathBuf>,
     launcher_written: bool,
@@ -359,10 +382,14 @@ impl MacInstall {
         if self.done {
             return;
         }
-        let current = home.join("runtime").join("current");
-        let _ = fs::remove_file(&current);
-        if let Some(prev) = self.previous_current.take() {
-            let _ = std::os::unix::fs::symlink(prev, &current);
+        // Échec avant (ou sans) l'étape 2 d'install_mac : le lien courant n'a pas été touché, il reste tel quel.
+        if self.current_replaced {
+            let current = home.join("runtime").join("current");
+            let _ = fs::remove_file(&current);
+            if let Some(prev) = self.previous_current.take() {
+                let _ = std::os::unix::fs::symlink(prev, &current);
+            }
+            self.current_replaced = false;
         }
         if let Some(dir) = self.new_runtime.take() {
             let _ = fs::remove_dir_all(dir);
@@ -370,12 +397,14 @@ impl MacInstall {
         if let Some((place, aside)) = self.replaced_runtime.take() {
             let _ = fs::rename(aside, place);
         }
-        let launcher = crate::env::launcher_path();
-        if self.launcher_written {
-            let _ = fs::remove_dir_all(&launcher);
-        }
-        if let Some(b) = self.launcher_backup.take() {
-            let _ = fs::rename(b, &launcher);
+        if self.launcher_written || self.launcher_backup.is_some() {
+            let launcher = crate::env::launcher_path();
+            if self.launcher_written {
+                let _ = fs::remove_dir_all(&launcher);
+            }
+            if let Some(b) = self.launcher_backup.take() {
+                let _ = fs::rename(b, &launcher);
+            }
         }
     }
 }
@@ -415,6 +444,7 @@ pub fn install_mac(tar_gz: &[u8], tag: &str, home: &Path, state: &mut MacInstall
     // 2. runtime/current -> runtime/<étiquette>
     let current = runtime_root.join("current");
     state.previous_current = fs::read_link(&current).ok();
+    state.current_replaced = true;
     let _ = fs::remove_file(&current);
     symlink(&target, &current).map_err(|e| explain_io(&current, e))?;
 
@@ -442,7 +472,7 @@ pub fn install_mac(tar_gz: &[u8], tag: &str, home: &Path, state: &mut MacInstall
 #[cfg(target_os = "macos")]
 pub fn uninstall_mac(home: &Path, files: &[String]) -> Result<(), String> {
     for rel in files {
-        if rel.contains("..") || !rel.starts_with("runtime/") {
+        if !is_safe_relative(rel) || !rel.starts_with("runtime/") {
             continue;
         }
         let dir = home.join(rel);
@@ -459,6 +489,54 @@ pub fn uninstall_mac(home: &Path, files: &[String]) -> Result<(), String> {
         fs::remove_dir_all(&launcher).map_err(|e| explain_io(&launcher, e))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    /// `Backup` garde ses copies dans un dossier propre au processus : un test qui s'en sert à la fois.
+    pub(crate) static BACKUP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn restauration_signale_ce_qui_n_a_pas_pu_revenir() {
+        let _lock = BACKUP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = std::env::temp_dir().join(format!("su-test-restauration-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let (a, b, c) = (dir.join("a.txt"), dir.join("b.txt"), dir.join("c.txt"));
+        fs::write(&a, b"avant").unwrap();
+        fs::write(&b, b"avant").unwrap();
+        let mut backup = Backup::new();
+        backup.write(&a, b"apres").unwrap();
+        backup.write(&b, b"apres").unwrap();
+        backup.write(&c, b"nouveau").unwrap();
+        // Fichier noté mais jamais écrit (échec de l'écriture) : rien à signaler
+        backup.entries.push((dir.join("jamais.txt"), None));
+        // Copie de b perdue : b ne peut pas revenir
+        fs::remove_file(backup.entries[1].1.as_ref().unwrap()).unwrap();
+        let failed = backup.restore();
+        assert_eq!(failed.len(), 1, "{failed:?}");
+        assert!(failed[0].contains("b.txt"));
+        assert_eq!(fs::read(&a).unwrap(), b"avant");
+        assert!(!c.exists());
+        drop(backup);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn chemins_des_notes_strictement_relatifs() {
+        for ok in ["wsock32.dll", "millennium/lib/millennium.dll", "runtime/v3.6.2"] {
+            assert!(is_safe_relative(ok), "{ok}");
+        }
+        for bad in ["", "/etc/passwd", "../steam.exe", "millennium/../../x", "./wsock32.dll"] {
+            assert!(!is_safe_relative(bad), "{bad}");
+        }
+        #[cfg(windows)]
+        for bad in [r"C:\Windows\System32\x.dll", "C:x.dll", r"\Windows\x.dll", r"\\serveur\partage\x", r"\\?\C:\x"] {
+            assert!(!is_safe_relative(bad), "{bad}");
+        }
+    }
 }
 
 #[cfg(all(test, target_os = "macos"))]
@@ -525,6 +603,32 @@ mod tests_mac {
         assert!(!home.join("runtime/v3.6.2").exists());
         assert!(fs::symlink_metadata(&current).is_err(), "lien courant retiré");
         assert!(!launcher.exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// Échec avant la pose du runtime (Steam qui ne se ferme pas, réseau, archive refusée, erreur du plugin pendant une
+    /// réparation) : le retour en arrière ne touche pas au lien courant, le lanceur reste fonctionnel.
+    #[test]
+    fn retour_en_arriere_apres_erreur_precoce() {
+        let base = std::env::temp_dir().join(format!("su-test-mac-precoce-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let home = base.join("Millennium");
+        let runtime = home.join("runtime/v3.6.2");
+        fs::create_dir_all(&runtime).unwrap();
+        fs::write(runtime.join("libmillennium.dylib"), b"").unwrap();
+        let current = home.join("runtime/current");
+        std::os::unix::fs::symlink(&runtime, &current).unwrap();
+
+        // Rien de posé (erreur avant install_mac)
+        MacInstall::default().rollback(&home);
+        assert_eq!(fs::read_link(&current).unwrap(), runtime, "lien courant intact après une erreur précoce");
+
+        // Archive refusée par install_mac, puis retour en arrière
+        let mut st = MacInstall::default();
+        assert!(install_mac(b"pas une archive", "v9.9.9", &home, &mut st).is_err());
+        st.rollback(&home);
+        assert_eq!(fs::read_link(&current).unwrap(), runtime, "lien courant intact après une archive refusée");
+        assert!(current.join("libmillennium.dylib").is_file());
         let _ = fs::remove_dir_all(&base);
     }
 }

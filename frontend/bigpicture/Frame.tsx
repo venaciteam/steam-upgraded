@@ -164,20 +164,18 @@ function useFooterHost(enabled: boolean, ref: { current: HTMLElement | null }): 
 		if (!doc) return undefined;
 		const el = doc.createElement('div');
 		el.className = 'spbp-footinfo';
-		let stop = false;
+		let timer: any = 0;
+		// Une seule minuterie : toutes les 500 ms tant que le pied de page n'est pas là, puis toutes les 2 s
+		// (Steam peut redessiner son pied de page : on vérifie de temps en temps que le texte y est encore)
 		const place = () => {
-			if (stop) return;
 			const foot = doc.querySelector('.BasicFooter');
 			if (foot && el.parentElement !== foot) foot.appendChild(el);
-			if (!el.parentElement) setTimeout(place, 500);
-			else setHost(el);
+			if (el.parentElement) setHost(el);
+			timer = setTimeout(place, el.parentElement ? 2000 : 500);
 		};
 		place();
-		// Steam peut redessiner son pied de page : on vérifie de temps en temps que le texte y est encore
-		const iv = setInterval(place, 2000);
 		return () => {
-			stop = true;
-			clearInterval(iv);
+			clearTimeout(timer);
 			el.remove();
 			setHost(null);
 		};

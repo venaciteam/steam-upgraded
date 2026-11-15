@@ -1,8 +1,9 @@
 -- Téléchargement d'un fichier binaire et empreinte SHA-256, sur toutes les plateformes.
 -- Le module http de Millennium coupe le corps d'une réponse au premier octet nul : inutilisable pour un .star ou une image.
--- Windows : urlmon et bcrypt (FFI LuaJIT), en place depuis la 0.1.0.
--- Ailleurs (macOS, Linux) : http.download (Millennium 3.6 et plus) écrit le fichier sur le disque, relu ensuite en binaire ;
--- SHA-256 calculé en Lua (opérations bit de LuaJIT).
+-- Téléchargement : http.download (Millennium 3.6 et plus) écrit le fichier sur le disque, relu ensuite en binaire, avec un
+-- délai maximal (le backend ne traite rien d'autre pendant un téléchargement). Windows avec un Millennium plus ancien :
+-- urlmon (FFI LuaJIT, en place depuis la 0.1.0), synchrone et sans délai réglable (seuls ceux de WinINet s'appliquent).
+-- SHA-256 : bcrypt sous Windows, calculé en Lua ailleurs (opérations bit de LuaJIT).
 
 local http = require("http")
 local bit  = require("bit")
@@ -19,6 +20,14 @@ do
             long __stdcall BCryptOpenAlgorithmProvider(void **phAlgorithm, const uint16_t *pszAlgId, const uint16_t *pszImplementation, unsigned long dwFlags);
             long __stdcall BCryptHash(void *hAlgorithm, unsigned char *pbSecret, unsigned long cbSecret, const unsigned char *pbInput, unsigned long cbInput, unsigned char *pbOutput, unsigned long cbOutput);
             long __stdcall BCryptCloseAlgorithmProvider(void *hAlgorithm, unsigned long dwFlags);
+        ]])
+        pcall(ffi.cdef, [[
+            unsigned long __stdcall GetTempPathW(unsigned long len, uint16_t *buf);
+            unsigned long __stdcall GetShortPathNameW(const uint16_t *longPath, uint16_t *shortPath, unsigned long len);
+            int __stdcall WideCharToMultiByte(unsigned int codePage, unsigned long flags, const uint16_t *wide, int wideLen, char *out, int outLen, const char *defaultChar, int *usedDefaultChar);
+        ]])
+        pcall(ffi.cdef, [[
+            unsigned int __stdcall GetACP(void);
         ]])
         local ok_u, urlmon = pcall(ffi.load, "urlmon")
         local ok_b, bcrypt = pcall(ffi.load, "bcrypt")
@@ -38,10 +47,63 @@ local function read_and_remove(path)
     return data
 end
 
+local DOWNLOAD_TIMEOUT = 180 -- secondes, téléchargement complet (archive de Millennium, visuels animés de plus de 8 Mo)
+
 local function temp_dir()
     local d = os.getenv("TMPDIR") or os.getenv("TMP") or os.getenv("TEMP") or "/tmp"
     if d:sub(-1) ~= "/" and d:sub(-1) ~= "\\" then d = d .. "/" end
     return d
+end
+
+-- Windows : io.open, os.remove, URLDownloadToFileA et le fopen de http.download lisent les chemins dans la page de
+-- code ANSI. Un nom de compte qui en sort (ex. cyrillique ou chinois sur un Windows français) donnerait un chemin faux :
+-- le dossier temporaire est lu en UTF-16 puis pris sous son nom court 8.3 quand il existe. S'il ne s'écrit toujours
+-- pas dans la page de code, refus explicite plutôt qu'un fichier écrit ailleurs.
+-- Page de code ANSI UTF-8 (65001, option « Bêta : Unicode UTF-8 » de Windows) : WideCharToMultiByte y exige des
+-- options 0 ou WC_ERR_INVALID_CHARS et lpUsedDefaultChar NULL, sinon il échoue ; tout chemin UTF-16 valide s'y écrit.
+local function win_temp_dir()
+    local ffi = win.ffi
+    local lossy = false -- caractère absent de la page de code : la lecture ANSI le remplacerait aussi (« ? » ou voisin)
+    local ok, dir = pcall(function()
+        local long = ffi.new("uint16_t[?]", 1024)
+        local n = tonumber(ffi.C.GetTempPathW(1024, long))
+        if n == 0 or n >= 1024 then return nil end
+        local short = ffi.new("uint16_t[?]", 1024)
+        local s = tonumber(ffi.C.GetShortPathNameW(long, short, 1024))
+        local wide = (s > 0 and s < 1024) and short or long
+        local out = ffi.new("char[?]", 2048)
+        local ok_acp, acp = pcall(function() return tonumber(ffi.C.GetACP()) end)
+        if ok_acp and acp == 65001 then
+            -- CP_UTF8, WC_ERR_INVALID_CHARS : échec plutôt qu'un U+FFFD à la place d'un UTF-16 invalide
+            local m = tonumber(ffi.C.WideCharToMultiByte(65001, 0x80, wide, -1, out, 2048, nil, nil))
+            if m == 0 then return nil end
+            return ffi.string(out)
+        end
+        local used = ffi.new("int[1]")
+        -- CP_ACP, WC_NO_BEST_FIT_CHARS : aucun caractère remplacé par un voisin
+        local m = tonumber(ffi.C.WideCharToMultiByte(0, 0x400, wide, -1, out, 2048, nil, used))
+        if m == 0 then return nil end
+        if used[0] ~= 0 then
+            lossy = true
+            return nil
+        end
+        return ffi.string(out)
+    end)
+    if (not ok or dir == nil) and not lossy then
+        -- Fonctions UTF-16 indisponibles ou conversion en échec : ancienne lecture ANSI, refusée si Windows y a remplacé
+        -- des caractères par « ? ». Pas de repli quand un caractère manque à la page de code : GetTempPathA le
+        -- remplacerait par « ? » ou par un voisin (best fit, ex. « Ł » en « L »), donc un autre dossier.
+        ok, dir = pcall(function()
+            local buf = ffi.new("char[?]", 520)
+            local n = tonumber(ffi.C.GetTempPathA(520, buf))
+            if n == 0 or n >= 520 then return nil end
+            return ffi.string(buf, n)
+        end)
+        if ok and type(dir) == "string" and dir:find("?", 1, true) then dir = nil end
+    end
+    if not ok or type(dir) ~= "string" or dir == "" then return nil end
+    if dir:sub(-1) ~= "\\" and dir:sub(-1) ~= "/" then dir = dir .. "\\" end
+    return dir
 end
 
 ---Télécharge `url` et renvoie son contenu binaire, ou nil et un message.
@@ -49,13 +111,20 @@ end
 ---@param tag string préfixe du fichier temporaire
 function M.download(url, tag)
     local name = "steamupgraded-" .. tag .. "-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+    local dir = temp_dir()
     if win then
+        dir = win_temp_dir()
+        if not dir then return nil, "dossier temporaire au nom non pris en charge" end
+    end
+    local path = dir .. name
+    local ok, res, err = false, "téléchargement indisponible (Millennium trop ancien)", nil
+    if type(http.download) == "function" then
+        ok, res, err = pcall(http.download, url, path, { timeout = DOWNLOAD_TIMEOUT })
+    end
+    if not ok and win then
+        -- Millennium sans http.download (ou appel refusé) : urlmon, seul moyen sous Windows jusqu'à la 0.2.6
+        os.remove(path)
         if not win.urlmon then return nil, "téléchargement indisponible sur ce système" end
-        local ffi = win.ffi
-        local buf = ffi.new("char[?]", 520)
-        local n = ffi.C.GetTempPathA(520, buf)
-        if n == 0 then return nil, "dossier temporaire introuvable" end
-        local path = ffi.string(buf, n) .. name
         local hr = tonumber(win.urlmon.URLDownloadToFileA(nil, url, path, 0, nil))
         if hr ~= 0 then
             os.remove(path)
@@ -63,9 +132,6 @@ function M.download(url, tag)
         end
         return read_and_remove(path)
     end
-    if type(http.download) ~= "function" then return nil, "téléchargement indisponible (Millennium trop ancien)" end
-    local path = temp_dir() .. name
-    local ok, res, err = pcall(http.download, url, path, { timeout = 60 })
     if not ok then
         os.remove(path)
         return nil, tostring(res)

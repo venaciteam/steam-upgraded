@@ -72,9 +72,20 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 		setOpen((o) => !o);
 	};
 
+	// Double clic avant que Steam passe le jeu en « Lancement » : l'action ne part qu'une fois (RunGame lancé deux fois sinon).
+	// Délai propre à chaque action (genre et machine) : une autre action choisie juste après n'est pas ignorée.
+	const lastRun = useRef(new Map<string, number>());
+	const runOnce = (a: GameAction) => {
+		const key = `${a.kind}:${a.machine?.id ?? ''}`;
+		const now = Date.now();
+		if (now - (lastRun.current.get(key) ?? 0) < 1500) return;
+		lastRun.current.set(key, now);
+		a.run();
+	};
+
 	const pick = (a: GameAction) => {
 		setOpen(false);
-		if (!a.disabled) a.run();
+		if (!a.disabled) runOnce(a);
 	};
 
 	// Le style reçu vise le bouton (hauteur, marges, police) ; seule sa part de mise en page (flex, largeur, marges
@@ -114,7 +125,7 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 				disabled={st.disabled && !st.downloading}
 				title={st.hint || (short !== st.label ? st.label : undefined)}
 				aria-label={st.downloading ? `${label}, voir dans les téléchargements` : name ? label : short !== st.label ? st.label : undefined}
-				onClick={() => (st.downloading ? navigate(ROUTES.downloads) : !st.disabled && gameActions(app).primary.run())}
+				onClick={() => (st.downloading ? navigate(ROUTES.downloads) : !st.disabled && runOnce(gameActions(app).primary))}
 				style={{
 					height: h,
 					padding: big ? undefined : compact ? '0 14px' : '0 18px',

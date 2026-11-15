@@ -8,8 +8,9 @@ mod system;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use env::Env;
 use millennium::Backup;
@@ -40,6 +41,33 @@ struct Detection {
     steam: SteamInfo,
     millennium: MillenniumInfo,
     plugin: Option<plugin::Installed>,
+}
+
+/// Vrai pendant une installation ou une désinstallation : la fenêtre refuse alors de se fermer (Alt+F4, barre des
+/// tâches, Cmd+W, Cmd+Q par l'entrée Quitter de `macos_menu`), sinon le processus s'arrêterait sans remettre les fichiers en place.
+#[derive(Default)]
+struct Busy(AtomicBool);
+
+impl Busy {
+    fn start(&self) -> Result<BusyGuard<'_>, String> {
+        if self.0.swap(true, Ordering::SeqCst) {
+            return Err("Une opération est déjà en cours.".into());
+        }
+        Ok(BusyGuard(self))
+    }
+
+    fn is_busy(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// Opération en cours tant que ce garde existe.
+struct BusyGuard<'a>(&'a Busy);
+
+impl Drop for BusyGuard<'_> {
+    fn drop(&mut self) {
+        self.0 .0.store(false, Ordering::SeqCst);
+    }
 }
 
 fn steam_of(env: &Env) -> Result<PathBuf, String> {
@@ -179,12 +207,31 @@ async fn tokio_sleep(ms: u64) {
     tauri::async_runtime::spawn_blocking(move || std::thread::sleep(Duration::from_millis(ms))).await.ok();
 }
 
+/// Relance de Steam, une fois l'opération terminée. Un échec ici ne défait rien : l'opération a réussi, la fenêtre le
+/// dit et invite seulement à ouvrir Steam (étape marquée « skip »).
 fn relaunch(out: &Out, env: &Env, was_running: bool) -> Result<(), String> {
     step(out, "relancer", "run", "");
-    env.launch_steam()?;
     let _ = was_running;
-    step(out, "relancer", "ok", "");
+    match env.launch_steam() {
+        Ok(()) => step(out, "relancer", "ok", ""),
+        Err(e) => step(out, "relancer", "skip", format!("Steam n'a pas pu être relancé ({e}) : ouvrez-le vous-même.")),
+    }
     Ok(())
+}
+
+/// Échec d'une installation ou d'une désinstallation, tel que la fenêtre le reçoit.
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct Failure {
+    message: String,
+    /// Fichiers qui n'ont pas pu être remis en place (chemin et raison) ; vide si tout est revenu comme avant.
+    not_restored: Vec<String>,
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Failure {
+        Failure { message, not_restored: vec![] }
+    }
 }
 
 #[derive(Deserialize)]
@@ -196,11 +243,12 @@ struct InstallOptions {
 
 /// Installe (ou répare) : Millennium si demandé, puis le plugin. En cas d'échec, tout est remis en place et Steam relancé.
 #[tauri::command]
-async fn install(app: AppHandle, env: State<'_, Env>, options: InstallOptions) -> Result<(), String> {
+async fn install(app: AppHandle, env: State<'_, Env>, busy: State<'_, Busy>, options: InstallOptions) -> Result<(), Failure> {
+    let _busy = busy.start()?;
     install_impl(Out::window(app), env.inner().clone(), options).await
 }
 
-async fn install_impl(out: Out, env: Env, options: InstallOptions) -> Result<(), String> {
+async fn install_impl(out: Out, env: Env, options: InstallOptions) -> Result<(), Failure> {
     let steam = steam_of(&env)?;
     let mut backup = Backup::new();
     #[cfg(target_os = "macos")]
@@ -257,14 +305,14 @@ async fn install_impl(out: Out, env: Env, options: InstallOptions) -> Result<(),
             Ok(())
         }
         Err(e) => {
-            backup.restore();
+            let not_restored = backup.restore();
             #[cfg(target_os = "macos")]
             mac_state.rollback(&plugin::millennium_dir(&steam));
             step(&out, current, "err", e.clone());
             if was_running {
                 let _ = env.launch_steam();
             }
-            Err(e)
+            Err(Failure { message: e, not_restored })
         }
     }
 }
@@ -277,11 +325,12 @@ struct UninstallOptions {
 
 /// Retire le plugin et ses réglages ; Millennium aussi si l'installeur l'avait posé et si c'est demandé.
 #[tauri::command]
-async fn uninstall(app: AppHandle, env: State<'_, Env>, options: UninstallOptions) -> Result<(), String> {
+async fn uninstall(app: AppHandle, env: State<'_, Env>, busy: State<'_, Busy>, options: UninstallOptions) -> Result<(), Failure> {
+    let _busy = busy.start()?;
     uninstall_impl(Out::window(app), env.inner().clone(), options).await
 }
 
-async fn uninstall_impl(out: Out, env: Env, options: UninstallOptions) -> Result<(), String> {
+async fn uninstall_impl(out: Out, env: Env, options: UninstallOptions) -> Result<(), Failure> {
     let steam = steam_of(&env)?;
     let mut backup = Backup::new();
     let mut current = "fermer";
@@ -299,7 +348,7 @@ async fn uninstall_impl(out: Out, env: Env, options: UninstallOptions) -> Result
             step(&out, current, "run", "");
             #[cfg(windows)]
             for rel in &marker.millennium_files {
-                if rel.contains("..") {
+                if !millennium::is_safe_relative(rel) {
                     continue;
                 }
                 backup.remove(&steam.join(rel))?;
@@ -325,12 +374,12 @@ async fn uninstall_impl(out: Out, env: Env, options: UninstallOptions) -> Result
             Ok(())
         }
         Err(e) => {
-            backup.restore();
+            let not_restored = backup.restore();
             step(&out, current, "err", e.clone());
             if was_running {
                 let _ = env.launch_steam();
             }
-            Err(e)
+            Err(Failure { message: e, not_restored })
         }
     }
 }
@@ -359,10 +408,66 @@ fn headless() -> Option<i32> {
     match res {
         Ok(()) => Some(0),
         Err(e) => {
-            eprintln!("Échec : {e}");
+            eprintln!("Échec : {}", e.message);
+            for f in &e.not_restored {
+                eprintln!("Non remis en place : {f}");
+            }
             Some(1)
         }
     }
+}
+
+/// macOS : l'entrée Quitter du menu par défaut de Tauri passe par `terminate:`, que tao ne transmet pas (aucun
+/// `ExitRequested`) : Cmd+Q arrêterait l'installeur au milieu d'une opération, sans remettre les fichiers en place.
+/// Menu équivalent avec un Quitter maison, sans effet pendant une opération. Le menu Édition reste indispensable :
+/// sans lui, Cmd+V ne colle rien (clé SteamGridDB).
+#[cfg(target_os = "macos")]
+const QUIT_ID: &str = "quitter";
+
+#[cfg(target_os = "macos")]
+fn macos_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+    let name = app.package_info().name.clone();
+    let about = AboutMetadata { name: Some(name.clone()), version: Some(app.package_info().version.to_string()), ..Default::default() };
+    Menu::with_items(
+        app,
+        &[
+            &Submenu::with_items(
+                app,
+                &name,
+                true,
+                &[
+                    &PredefinedMenuItem::about(app, Some(&format!("À propos de {name}")), Some(about))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::hide(app, Some(&format!("Masquer {name}")))?,
+                    &PredefinedMenuItem::hide_others(app, Some("Masquer les autres"))?,
+                    &PredefinedMenuItem::show_all(app, Some("Tout afficher"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, QUIT_ID, format!("Quitter {name}"), true, Some("CmdOrCtrl+Q"))?,
+                ],
+            )?,
+            &Submenu::with_items(
+                app,
+                "Édition",
+                true,
+                &[
+                    &PredefinedMenuItem::undo(app, Some("Annuler"))?,
+                    &PredefinedMenuItem::redo(app, Some("Rétablir"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::cut(app, Some("Couper"))?,
+                    &PredefinedMenuItem::copy(app, Some("Copier"))?,
+                    &PredefinedMenuItem::paste(app, Some("Coller"))?,
+                    &PredefinedMenuItem::select_all(app, Some("Tout sélectionner"))?,
+                ],
+            )?,
+            &Submenu::with_items(
+                app,
+                "Fenêtre",
+                true,
+                &[&PredefinedMenuItem::minimize(app, Some("Réduire"))?, &PredefinedMenuItem::close_window(app, Some("Fermer"))?],
+            )?,
+        ],
+    )
 }
 
 fn main() {
@@ -370,9 +475,32 @@ fn main() {
     if let Some(code) = headless() {
         std::process::exit(code);
     }
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(Env::from_args())
+        .manage(Busy::default())
         .invoke_handler(tauri::generate_handler![detect, millennium_latest, steam_running, sgdb_check, open_url, install, uninstall])
-        .run(tauri::generate_context!())
-        .expect("impossible de démarrer l'installeur");
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.state::<Busy>().is_busy() {
+                    api.prevent_close();
+                }
+            }
+        });
+    // Fermer (Cmd+W) passe par CloseRequested, bloqué ci-dessus ; Quitter (Cmd+Q) par cette entrée maison
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(macos_menu).on_menu_event(|app, event| {
+        if event.id() == QUIT_ID && !app.state::<Busy>().is_busy() {
+            app.exit(0);
+        }
+    });
+    builder
+        .build(tauri::generate_context!())
+        .expect("impossible de démarrer l'installeur")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if app.state::<Busy>().is_busy() {
+                    api.prevent_exit();
+                }
+            }
+        });
 }

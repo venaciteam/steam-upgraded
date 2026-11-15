@@ -19,6 +19,7 @@ import { initChatSkin } from './features/chatSkin';
 import { initToastSkin } from './features/toastSkin';
 import { initMediaRedirect } from './features/mediaRedirect';
 import { initUpdates } from './features/updates';
+import { disableMillenniumSelfUpdate } from './features/millennium';
 import { BpHome } from './bigpicture/Home';
 import { BpLibrary } from './bigpicture/Library';
 import { BpGame } from './bigpicture/GamePage';
@@ -36,6 +37,9 @@ async function start() {
 	if (started) return;
 	started = true;
 	initClassAliases();
+	// Avant toute écriture de réglages : Core_SetBackendConfig réécrit toute la configuration (voir millennium.ts).
+	// Jamais plus de 1,5 s d'attente, Millennium peut ne pas répondre au premier démarrage.
+	await Promise.race([disableMillenniumSelfUpdate(), new Promise((ok) => setTimeout(ok, 1500))]);
 	await loadSettings();
 	routerHook.addRoute(ROUTES.library, LibraryPage);
 	routerHook.addRoute('/steamupgraded/app/:appid', GamePage);
