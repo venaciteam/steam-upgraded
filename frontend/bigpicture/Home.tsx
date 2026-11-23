@@ -14,8 +14,22 @@ const PlayIcon = () => (
 	</svg>
 );
 
+const StopIcon = () => (
+	<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+		<path d="M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
+	</svg>
+);
+
+const CancelIcon = () => (
+	<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+		<path d="M6 6l12 12M18 6 6 18" />
+	</svg>
+);
+
 function Resume({ g }: { g: Game }) {
-	const st = primaryState(g.app);
+	const st = primaryState(g.app, { bp: true });
+	// Jeu lancé : Reprendre en bouton principal, Quitter le jeu à côté
+	const quit = st.kind === 'resume' ? st.choices.find((c) => c.kind === 'stop') : undefined;
 	const facts = [g.last ? `Dernière session ${formatLastPlayed(g.last)}` : '', g.mins ? `${formatBigHours(g.mins)} de jeu` : '', g.copies > 1 ? `${plural(g.copies, 'copie', 'copies')} dans la famille` : '']
 		.filter(Boolean)
 		.join(' · ');
@@ -38,9 +52,15 @@ function Resume({ g }: { g: Game }) {
 						onSecondaryButton={(e: any) => openGameOptions(g.app, e?.currentTarget)}
 						onSecondaryActionDescription="Options"
 					>
-						<PlayIcon />
+						{st.kind === 'cancel' ? <CancelIcon /> : <PlayIcon />}
 						{st.label}
 					</DialogButton>
+					{quit && (
+						<DialogButton className="spbp-btn spbp-btn--glass" noFocusRing onClick={() => quit.run()} onOKActionDescription={quit.label}>
+							<StopIcon />
+							{quit.label}
+						</DialogButton>
+					)}
 					<DialogButton className="spbp-btn spbp-btn--glass" noFocusRing onClick={() => openGame(g.appid)} onOKActionDescription="Ouvrir">
 						Fiche du jeu
 					</DialogButton>

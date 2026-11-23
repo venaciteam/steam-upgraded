@@ -1,7 +1,7 @@
 // Bouton Jouer / Installer / Streamer d'un jeu, avec une flèche qui liste les autres possibilités (autres machines du
 // compte, ou « non disponible » sur ce système). Sans autre machine, la flèche n'apparaît pas : bouton d'origine.
 import { useEffect, useRef, useState } from 'react';
-import { GameAction, gameActions } from '../../core/machines';
+import { GameAction, gameActions, isRunningAction } from '../../core/machines';
 import { primaryState } from './data';
 import { navigate, ROUTES } from '../../core/steam';
 
@@ -13,6 +13,9 @@ const ICON = {
 	stream: <path d="M3 6h18v11H3zM8 21h8M12 17v4M10 9.5v4l3.5-2z" />,
 	'remote-install': <path d="M3 6h18v11H3zM8 21h8M12 17v4M12 8v5.5M9.5 11l2.5 2.5 2.5-2.5" />,
 	unavailable: <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8" />,
+	cancel: <path d="M6 6l12 12M18 6 6 18" />,
+	stop: <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />,
+	resume: <path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none" />,
 };
 
 function Glyph({ kind, size }: { kind: keyof typeof ICON; size: number }) {
@@ -74,12 +77,17 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 
 	// Double clic avant que Steam passe le jeu en « Lancement » : l'action ne part qu'une fois (RunGame lancé deux fois sinon).
 	// Délai propre à chaque action (genre et machine) : une autre action choisie juste après n'est pas ignorée.
+	// Annuler et Arrêter remplacent Jouer dès le lancement : le second clic d'un double clic sur Jouer ne doit pas
+	// annuler aussitôt le lancement (même délai, compté depuis n'importe quelle action du bouton).
 	const lastRun = useRef(new Map<string, number>());
+	const lastAny = useRef(0);
 	const runOnce = (a: GameAction) => {
 		const key = `${a.kind}:${a.machine?.id ?? ''}`;
 		const now = Date.now();
 		if (now - (lastRun.current.get(key) ?? 0) < 1500) return;
+		if (isRunningAction(a.kind) && now - lastAny.current < 1500) return;
 		lastRun.current.set(key, now);
+		lastAny.current = now;
 		a.run();
 	};
 
@@ -95,7 +103,7 @@ export function PlayControl({ app, name, compact, big, style }: Props) {
 	const fill = flex !== undefined || width !== undefined;
 	const h = btn.height ?? (big ? undefined : compact ? 36 : 40);
 	// Fiche du jeu : toujours le bouton plein ; cartes : plein pour jouer ou streamer, discret pour installer
-	const primaryLook = big || (!st.downloading && (st.kind === 'play' || st.kind === 'stream'));
+	const primaryLook = big || (!st.downloading && (st.kind === 'play' || st.kind === 'stream' || isRunningAction(st.kind)));
 	const cls = `sp-btn${primaryLook ? ' sp-btn--primary' : ''}${big ? ' sp-btn--big' : ''}`;
 	const iconSize = big ? 18 : compact ? 14 : 15;
 	const body = arrow.current?.ownerDocument?.body;

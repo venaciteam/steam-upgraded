@@ -51,8 +51,9 @@ export function openGameOptions(app: any, anchor?: any) {
 		showContextMenu(
 			<Menu label={app.display_name}>
 				{(() => {
-					// Jouer / installer / streamer : chaque possibilité s'il y a d'autres machines du compte (core/machines.ts)
-					const acts = gameActions(app);
+					// Jouer / installer / streamer : chaque possibilité s'il y a d'autres machines du compte (core/machines.ts) ;
+					// jeu lancé : Reprendre et Quitter le jeu
+					const acts = gameActions(app, { bp: true });
 					return (acts.choices.length > 1 ? acts.choices : [acts.primary]).map((a, i) => (
 						<MenuItem key={`act${i}`} disabled={a.disabled} onSelected={() => !a.disabled && a.run()}>
 							{a.label}

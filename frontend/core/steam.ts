@@ -196,7 +196,7 @@ export function formatLastPlayed(rt: number): string {
 
 // ---------- Actions sur un jeu ----------
 
-/** Action principale du jeu sur l'ordinateur devant soi (voir core/machines.ts : jouer, installer ou streamer). */
+/** Big Picture : action principale du jeu sur l'ordinateur devant soi (voir core/machines.ts : jouer, installer, streamer, reprendre). */
 const lastPrimary = new Map<number, number>();
 
 export function playOrInstall(app: any) {
@@ -204,7 +204,7 @@ export function playOrInstall(app: any) {
 	const now = Date.now();
 	if (now - (lastPrimary.get(app?.appid) || 0) < 1500) return;
 	lastPrimary.set(app?.appid, now);
-	runPrimary(app);
+	runPrimary(app, { bp: true });
 }
 
 export function openProperties(app: any) {

@@ -108,9 +108,13 @@ const UPDATE_STATES = new Set([18, 19, 20, 21, 39]);
  * Bouton principal d'un jeu : l'action sur l'ordinateur devant soi (core/machines.ts), avec les états en cours
  * (lancement, téléchargement…) de la machine visée. `choices` : toutes les possibilités, pour la flèche du bouton.
  */
-export function primaryState(app: any): PrimaryState {
-	const { primary, choices } = gameActions(app);
+export function primaryState(app: any, opts?: { bp?: boolean }): PrimaryState {
+	const { primary, choices } = gameActions(app, opts);
 	const base = { kind: primary.kind, choices };
+	// Jeu lancé : Annuler, Arrêter, Reprendre (core/machines.ts, runningActions)
+	if (primary.kind === 'cancel') return { ...base, label: primary.label, disabled: false, hint: 'Annuler le lancement du jeu' };
+	if (primary.kind === 'stop') return { ...base, label: primary.label, disabled: false, hint: 'Forcer la fermeture du jeu' };
+	if (primary.kind === 'resume') return { ...base, label: primary.label, disabled: false, hint: 'Revenir au jeu' };
 	const ds = Number(primary.machine ? primary.machine.displayStatus : (app?.display_status ?? 0));
 	if (ds === 4) return { ...base, label: 'En cours', disabled: true, hint: 'Le jeu est lancé' };
 	if (ds === 1) return { ...base, label: 'Lancement…', disabled: true };
@@ -252,7 +256,12 @@ export type CopyUse = { onCopy: Map<number, number[]>; elsewhere: number[]; unkn
 export function copyUse(appid: number, details: any, copies: Copy[] | null): CopyUse {
 	const me = myAccountId();
 	const onCopy = new Map<number, number[]>();
-	const total = Number(details?.unMembersPlaying || 0);
+	// Steam compte aussi ce compte parmi les joueurs : sans ce retrait, votre propre partie devenait « un membre de la
+	// famille y joue » (jeu lancé sur ce PC, ou sur un autre ordinateur du compte d'après votre présence)
+	const selfPlaying =
+		(w.SteamUIStore?.RunningApps || []).some((a: any) => Number(a?.appid) === appid) ||
+		Number(w.friendStore?.m_FriendsUIFriendStore?.m_mapPlayerCache?.get(me)?.m_persona?.m_unGamePlayedAppID) === appid;
+	const total = Math.max(0, Number(details?.unMembersPlaying || 0) - (selfPlaying ? 1 : 0));
 	const used = accountIdOf(String(details?.strOwnerSteamID || '0'));
 	const lockedBy = accountIdOf(String(details?.strLockedBySteamID || '0'));
 	const place = (owner: number, player: number) => onCopy.set(owner, [...(onCopy.get(owner) || []), player]);
