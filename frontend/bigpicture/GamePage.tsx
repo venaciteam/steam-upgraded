@@ -87,7 +87,13 @@ const BP_ICON = {
 	stream: 'M3 6h18v11H3zM8 21h8M12 17v4M10 9.5v4l3.5-2z',
 	'remote-install': 'M3 6h18v11H3zM8 21h8M12 17v4M12 8v5.5M9.5 11l2.5 2.5 2.5-2.5',
 	unavailable: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8',
+	cancel: 'M6 6l12 12M18 6 6 18',
+	stop: 'M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+	resume: 'M7 4.5v15l12-7.5z',
 };
+
+/** Icônes pleines (les autres sont en trait). */
+const BP_FILLED = new Set(['play', 'resume', 'stop']);
 
 export function BpGame() {
 	const s = useSettings();
@@ -114,7 +120,9 @@ export function BpGame() {
 	}
 
 	const oled = s.bpTheme === 'oled';
-	const st = primaryState(app);
+	const st = primaryState(app, { bp: true });
+	// Jeu lancé : Reprendre en bouton principal, Quitter le jeu à côté
+	const quit = st.kind === 'resume' ? st.choices.find((c) => c.kind === 'stop') : undefined;
 	const several = !!copies && copies.length > 1;
 	const used = copies?.find((c) => c.preferred) || copies?.find((c) => c.isMe) || copies?.[0];
 	const use = copyUse(appid, details, copies);
@@ -166,11 +174,19 @@ export function BpGame() {
 					<span style={{ fontSize: 88, fontWeight: 800, lineHeight: 0.95, color: '#fff', letterSpacing: '-0.01em', textShadow: '0 2px 20px rgba(0,0,0,.5)', maxWidth: 1400 }}>{app.display_name}</span>
 					<Focusable flow-children="row" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
 						<DialogButton className="spbp-btn spbp-btn--primary" noFocusRing autoFocus disabled={st.disabled && !st.downloading} onClick={() => (st.downloading ? bpNavigate(ROUTES.bpDownloads) : playOrInstall(app))} onOKActionDescription={st.downloading ? 'Voir les téléchargements' : st.label} style={{ height: 76, fontSize: 28 }}>
-							<svg width="28" height="28" viewBox="0 0 24 24" fill={st.kind === 'play' ? 'currentColor' : 'none'} stroke={st.kind === 'play' ? 'none' : 'currentColor'} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+							<svg width="28" height="28" viewBox="0 0 24 24" fill={BP_FILLED.has(st.kind) ? 'currentColor' : 'none'} stroke={BP_FILLED.has(st.kind) ? 'none' : 'currentColor'} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
 								<path d={BP_ICON[st.kind]} />
 							</svg>
 							{st.label}
 						</DialogButton>
+						{quit && (
+							<DialogButton className="spbp-btn spbp-btn--glass" noFocusRing onClick={() => quit.run()} onOKActionDescription={quit.label} style={{ height: 76 }}>
+								<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d={BP_ICON.stop} />
+								</svg>
+								{quit.label}
+							</DialogButton>
+						)}
 						<DialogButton className="spbp-btn spbp-btn--glass" noFocusRing onClick={() => openPropertiesBp(appid)} onOKActionDescription="Ouvrir" style={{ height: 76 }}>
 							Propriétés
 						</DialogButton>

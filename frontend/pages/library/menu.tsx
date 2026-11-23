@@ -15,6 +15,9 @@ const ICONS = {
 	stream: 'M3 6h18v11H3zM8 21h8M12 17v4M10 9.5v4l3.5-2z',
 	'remote-install': 'M3 6h18v11H3zM8 21h8M12 17v4M12 8v5.5M9.5 11l2.5 2.5 2.5-2.5',
 	unavailable: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8',
+	cancel: 'M6 6l12 12M18 6 6 18',
+	stop: 'M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+	resume: 'M7 4.5v15l12-7.5z',
 	card: 'M4 5h16v14H4zM8 9h8M8 13h5',
 	store: 'M4 7h16l-1.5 11h-13zM9 7a3 3 0 0 1 6 0',
 	folder: 'M3 7h6l2 2h10v10H3zM12 12v4M10 14h4',
@@ -37,7 +40,7 @@ export function Item({ icon, label, kind }: { icon: Icon; label: string; kind?: 
 		<span className={kind ? `sp-mi sp-mi--${kind}` : 'sp-mi'}>
 			<span className="sp-mi-ic" aria-hidden="true">
 				{icon && (
-					<svg width="16" height="16" viewBox="0 0 24 24" fill={icon === 'play' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={icon === 'check' ? 2.6 : 2} strokeLinecap="round" strokeLinejoin="round">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill={icon === 'play' || icon === 'stop' || icon === 'resume' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={icon === 'check' ? 2.6 : 2} strokeLinecap="round" strokeLinejoin="round">
 						<path d={ICONS[icon]} />
 					</svg>
 				)}

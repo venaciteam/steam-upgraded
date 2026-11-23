@@ -3,6 +3,10 @@
 // autres (Remote Play). Son champ `installed` décrit la machine SÉLECTIONNÉE pour le jeu, qui peut être un autre
 // ordinateur : sur un Mac, un jeu installé sur le PC paraissait « installé », et « Jouer » lançait un streaming.
 // Ici, l'action principale porte toujours sur l'ordinateur devant soi ; les autres machines sont des choix explicites.
+// Jeu en cours de lancement ou lancé : l'action devient Annuler, Arrêter (bureau) ou Reprendre et Quitter (Big Picture),
+// comme dans Steam d'origine.
+import { findModuleExport } from 'millennium';
+import { bpWindow, mainWindow } from './steam';
 
 const w = window as any;
 
@@ -16,9 +20,16 @@ export type Machine = {
 	/** Le jeu existe pour le système de cette machine (Steam : is_available_on_current_platform, os valide). */
 	available: boolean;
 	displayStatus: number;
+	/** Jeu de cette machine streamé vers l'ordinateur devant soi. */
+	streamingHere: boolean;
 };
 
-export type ActionKind = 'play' | 'install' | 'stream' | 'remote-install' | 'unavailable';
+export type ActionKind = 'play' | 'install' | 'stream' | 'remote-install' | 'unavailable' | 'cancel' | 'stop' | 'resume';
+
+/** Actions sur un jeu lancé (Annuler, Arrêter, Reprendre) : le délai anti-double clic de Jouer doit aussi les couvrir. */
+export function isRunningAction(kind: ActionKind): boolean {
+	return kind === 'cancel' || kind === 'stop' || kind === 'resume';
+}
 
 export type GameAction = {
 	kind: ActionKind;
@@ -54,6 +65,7 @@ function toMachine(c: any): Machine {
 		installed: !!c?.installed,
 		available: c?.is_available_on_current_platform !== false && !c?.is_invalid_os_type,
 		displayStatus: Number(c?.display_status ?? 0),
+		streamingHere: !!c?.streaming_to_local_client,
 	};
 }
 
@@ -109,16 +121,101 @@ function installHere(app: any) {
 	openInstallWizard([app.appid]);
 }
 
+// ---------- Jeu lancé ----------
+
+// États de Steam (display_status) : lancement, jeu en cours (36, fermeture en cours, reste « Fermeture… » grisé)
+const DS_LAUNCHING = 1;
+const DS_RUNNING = 4;
+
+type NativeAction = (action: string, app: any, clientid: string, launchSource: any, win: any) => (() => void) | null;
+let nativeAction: NativeAction | null | undefined;
+
 /**
- * Action principale et liste des choix d'un jeu.
+ * Fonction des boutons d'action de Steam (action, jeu, machine, origine, fenêtre) → fonction à appeler.
+ * Elle porte ses fenêtres et ses cas particuliers : « Quitter le jeu ? » avant de forcer la fermeture (et SteamVR, qu'elle
+ * quitte autrement), « Reprendre » qui ramène au jeu en Big Picture.
+ */
+function steamAction(): NativeAction | null {
+	if (nativeAction !== undefined) return nativeAction;
+	try {
+		nativeAction =
+			findModuleExport((e: any) => {
+				if (typeof e !== 'function') return false;
+				let s = '';
+				try {
+					s = Function.prototype.toString.call(e);
+				} catch {}
+				return s.includes('Local-only app action for non-local client data') && s.includes('CancelLaunch');
+			}) || null;
+	} catch {
+		nativeAction = null;
+	}
+	if (!nativeAction) console.error('[steam-upgraded] actions de jeu de Steam introuvables : arrêt sans confirmation');
+	return nativeAction;
+}
+
+/** Action native de Steam (« Stop », « Cancel », « ResumeGameInProgress »), sinon l'appel direct `fallback`. */
+function runSteamAction(action: string, app: any, clientid: string, bp: boolean, fallback: () => void) {
+	try {
+		const fn = steamAction()?.(action, app, clientid, undefined, bp ? bpWindow() : mainWindow());
+		if (typeof fn === 'function') return fn();
+	} catch (e) {
+		console.error('[steam-upgraded] action de Steam impossible', action, e);
+	}
+	fallback();
+}
+
+/**
+ * Actions d'un jeu en cours de lancement ou lancé sur l'ordinateur devant soi (ou streamé vers lui), null sinon.
+ * Bureau : Annuler pendant le lancement, puis Arrêter. Big Picture : Reprendre (retour au jeu) puis Quitter le jeu.
+ */
+function runningActions(app: any, m: ReturnType<typeof machinesOf>, bp: boolean): GameAction[] | null {
+	const gameid = String(app?.gameid || app?.appid);
+	const here = m.known ? m.here : null;
+	const hereDs = m.known ? (here?.displayStatus ?? 0) : Number(app?.display_status ?? 0);
+	if (hereDs === DS_LAUNCHING) {
+		return [{ kind: 'cancel', label: 'Annuler', machine: here || undefined, run: () => runSteamAction('Cancel', app, LOCAL_ID, bp, () => w.SteamClient.Apps.CancelLaunch(gameid)) }];
+	}
+	const streamed = hereDs === DS_RUNNING ? null : m.others.find((o) => o.displayStatus === DS_RUNNING && o.streamingHere);
+	if (hereDs !== DS_RUNNING && !streamed) return null;
+	const machine = streamed || here || undefined;
+	const clientid = machine?.id ?? LOCAL_ID;
+	const stop: GameAction = {
+		kind: 'stop',
+		label: streamed ? 'Arrêter la diffusion' : bp ? 'Quitter le jeu' : 'Arrêter',
+		machine,
+		run: () => runSteamAction('Stop', app, clientid, bp, () => w.SteamClient.Apps.TerminateApp(gameid, false)),
+	};
+	if (!bp) return [stop];
+	const resume: GameAction = {
+		kind: 'resume',
+		label: 'Reprendre',
+		machine,
+		// Steam ne remonte la fenêtre du jeu que si son overlay y est actif (pas dans Tomb Raider: Legend, par exemple) :
+		// on la remonte toujours ensuite
+		run: () => {
+			runSteamAction('ResumeGameInProgress', app, clientid, bp, () => {});
+			try {
+				w.SteamClient.Apps.RaiseWindowForGame(gameid);
+			} catch {}
+		},
+	};
+	return [resume, stop];
+}
+
+/**
+ * Action principale et liste des choix d'un jeu (`bp` : actions d'un jeu lancé adaptées à Big Picture).
+ * - Jeu lancé ou en cours de lancement : voir `runningActions`.
  * - Principale : jouer ici, sinon installer ici, sinon streamer depuis une machine où il est installé, sinon l'installer
  *   sur une autre machine, sinon indisponible.
  * - Choix : cette machine (jouer, installer ou « non disponible »), chaque machine où le jeu est installé (streaming), puis
  *   chaque machine où il peut l'être (installation à distance).
  *   Une seule entrée = pas de vrai choix : pas de flèche (cas d'un ordinateur seul).
  */
-export function gameActions(app: any): { primary: GameAction; choices: GameAction[] } {
+export function gameActions(app: any, opts?: { bp?: boolean }): { primary: GameAction; choices: GameAction[] } {
 	const m = machinesOf(app);
+	const running = runningActions(app, m, !!opts?.bp);
+	if (running) return { primary: running[0], choices: running };
 	if (!m.known) {
 		// Pas de données par machine (raccourci non Steam, ancienne version de Steam) : comportement d'origine
 		const a: GameAction = app?.installed
@@ -149,8 +246,8 @@ export function gameActions(app: any): { primary: GameAction; choices: GameActio
 }
 
 /** Lance l'action principale (cartes, menus, Big Picture). */
-export function runPrimary(app: any) {
-	const { primary } = gameActions(app);
+export function runPrimary(app: any, opts?: { bp?: boolean }) {
+	const { primary } = gameActions(app, opts);
 	if (!primary.disabled) primary.run();
 }
 
