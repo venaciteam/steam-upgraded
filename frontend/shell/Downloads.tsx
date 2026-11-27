@@ -1,10 +1,11 @@
 // Bouton « Téléchargements » de la barre du haut : ouvre la page des téléchargements et montre la progression.
 // Libellé affiché quand la barre a la place (theme.ts le masque en fenêtre étroite) ; au survol, une bulle détaille
-// le téléchargement en cours. Pas d'attribut `title` : l'infobulle native se réaffichait (clignotait) à chaque
-// changement du pourcentage.
+// le téléchargement en cours (dans une vraie fenêtre, pour passer au-dessus des pages web). Pas d'attribut `title` :
+// l'infobulle native se réaffichait (clignotait) à chaque changement du pourcentage.
 import { useEffect, useRef, useState } from 'react';
 import { appById, navigate, ROUTES } from '../core/steam';
 import { usePath } from '../core/history';
+import { openPopupWindow, PopupWindow } from '../core/popupWindow';
 
 const w = window as any;
 
@@ -66,90 +67,101 @@ function buttonLabel(st: DlState): string {
 
 const SHOW_DELAY = 250;
 
+/** Bulle de survol du bouton : rendue dans sa propre fenêtre, elle relit l'état chaque seconde. */
+function DownloadTip() {
+	const [st, setSt] = useState<DlState>(readState);
+	useEffect(() => {
+		const id = setInterval(() => setSt(readState()), 1000);
+		return () => clearInterval(id);
+	}, []);
+	const left = st.active && !st.paused ? remainingLabel(st.seconds) : '';
+	const facts = st.active ? [st.paused ? 'En pause' : speedLabel(st.speed), left && `Reste ${left}`].filter(Boolean) : [];
+	const waiting = st.queued > (st.active ? 1 : 0) ? `${st.queued - (st.active ? 1 : 0)} en attente` : '';
+	return (
+		<div role="tooltip" className={st.active ? 'sp-pop sp-popwin sp-dl-tip' : 'sp-pop sp-popwin sp-dl-tip sp-dl-tip--idle'}>
+			{st.active ? (
+				<>
+					<div className="sp-label">{st.paused ? 'En pause' : st.install ? 'Installation en cours' : 'Mise à jour en cours'}</div>
+					<div className="sp-dl-tip-name">{st.name || 'Jeu sans nom'}</div>
+					<div className="sp-dl-tip-row">
+						<span className="sp-dl-tip-bar">
+							<i style={{ width: `${st.pct}%` }} />
+						</span>
+						<strong>{st.pct} %</strong>
+					</div>
+					{facts.length > 0 && <div className="sp-muted sp-dl-tip-facts">{facts.join(' · ')}</div>}
+				</>
+			) : (
+				<div className="sp-dl-tip-name sp-dl-tip-idle">Aucun téléchargement en cours</div>
+			)}
+			{waiting && <div className="sp-muted sp-dl-tip-facts">{waiting}</div>}
+		</div>
+	);
+}
+
 export function DownloadsButton() {
 	const [st, setSt] = useState<DlState>(readState);
-	const [tip, setTip] = useState<{ top: number; right: number } | null>(null);
 	const btn = useRef<HTMLButtonElement>(null);
 	const timer = useRef<any>(0);
+	// Bulle dans une vraie fenêtre (core/popupWindow.tsx) : elle passe ainsi au-dessus des pages web de Valve
+	const tip = useRef<PopupWindow | null>(null);
 	const path = usePath();
+
+	const hide = () => {
+		clearTimeout(timer.current);
+		tip.current?.close();
+	};
 
 	useEffect(() => {
 		const id = setInterval(() => setSt(readState()), 1000);
 		return () => {
 			clearInterval(id);
-			clearTimeout(timer.current);
+			hide();
 		};
 	}, []);
 
 	const show = () => {
 		clearTimeout(timer.current);
 		timer.current = setTimeout(() => {
-			const el = btn.current;
-			if (!el) return;
-			const r = el.getBoundingClientRect();
-			const W = el.ownerDocument.defaultView?.innerWidth || 0;
-			setTip({ top: r.bottom + 8, right: Math.max(8, W - r.right) });
+			if (tip.current || !btn.current) return;
+			tip.current = openPopupWindow(<DownloadTip />, btn.current, {
+				align: 'right',
+				tooltip: true,
+				onClose: () => {
+					tip.current = null;
+				},
+			});
 		}, SHOW_DELAY);
-	};
-	const hide = () => {
-		clearTimeout(timer.current);
-		setTip(null);
 	};
 
 	const current = path === ROUTES.downloads || path.startsWith('/library/downloads');
-	const left = st.active && !st.paused ? remainingLabel(st.seconds) : '';
-	const facts = st.active ? [st.paused ? 'En pause' : speedLabel(st.speed), left && `Reste ${left}`].filter(Boolean) : [];
-	const waiting = st.queued > (st.active ? 1 : 0) ? `${st.queued - (st.active ? 1 : 0)} en attente` : '';
 
 	return (
-		<>
-			<button
-				ref={btn}
-				type="button"
-				className={st.active ? `sp-dl sp-dl-active${st.paused ? '' : ' sp-dl-moving'}` : 'sp-dl'}
-				aria-current={current ? 'page' : undefined}
-				aria-label="Téléchargements"
-				aria-describedby={tip ? 'sp-dl-tip' : undefined}
-				onClick={() => {
-					hide();
-					navigate(ROUTES.downloads);
-				}}
-				onMouseEnter={show}
-				onMouseLeave={hide}
-				onFocus={show}
-				onBlur={hide}
-			>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-					<path className="sp-dl-arrow" d="M12 4v11M7 10l5 5 5-5" />
-					<path d="M5 20h14" />
-				</svg>
-				<span className="sp-dl-text" aria-hidden="true">{buttonLabel(st)}</span>
-				{st.active && (
-					<span className="sp-dl-bar" aria-hidden="true">
-						<i style={{ width: `${st.pct}%` }} />
-					</span>
-				)}
-			</button>
-			{tip && (
-				<div id="sp-dl-tip" role="tooltip" className={st.active ? 'sp-pop sp-dl-tip' : 'sp-pop sp-dl-tip sp-dl-tip--idle'} style={{ top: tip.top, right: tip.right }}>
-					{st.active ? (
-						<>
-							<div className="sp-label">{st.paused ? 'En pause' : st.install ? 'Installation en cours' : 'Mise à jour en cours'}</div>
-							<div className="sp-dl-tip-name">{st.name || 'Jeu sans nom'}</div>
-							<div className="sp-dl-tip-row">
-								<span className="sp-dl-tip-bar">
-									<i style={{ width: `${st.pct}%` }} />
-								</span>
-								<strong>{st.pct} %</strong>
-							</div>
-							{facts.length > 0 && <div className="sp-muted sp-dl-tip-facts">{facts.join(' · ')}</div>}
-						</>
-					) : (
-						<div className="sp-dl-tip-name sp-dl-tip-idle">Aucun téléchargement en cours</div>
-					)}
-					{waiting && <div className="sp-muted sp-dl-tip-facts">{waiting}</div>}
-				</div>
+		<button
+			ref={btn}
+			type="button"
+			className={st.active ? `sp-dl sp-dl-active${st.paused ? '' : ' sp-dl-moving'}` : 'sp-dl'}
+			aria-current={current ? 'page' : undefined}
+			aria-label={buttonLabel(st)}
+			onClick={() => {
+				hide();
+				navigate(ROUTES.downloads);
+			}}
+			onMouseEnter={show}
+			onMouseLeave={hide}
+			onFocus={show}
+			onBlur={hide}
+		>
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+				<path className="sp-dl-arrow" d="M12 4v11M7 10l5 5 5-5" />
+				<path d="M5 20h14" />
+			</svg>
+			<span className="sp-dl-text" aria-hidden="true">{buttonLabel(st)}</span>
+			{st.active && (
+				<span className="sp-dl-bar" aria-hidden="true">
+					<i style={{ width: `${st.pct}%` }} />
+				</span>
 			)}
-		</>
+		</button>
 	);
 }
