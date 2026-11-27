@@ -113,7 +113,7 @@ ${hdrImages}
 .sp-dl-text{line-height:1;}
 .sp-dl-active .sp-dl-text{color:var(--sp-text);}
 /* Bulle du bouton Téléchargements (au survol) : téléchargement en cours et avancement */
-.sp-pop.sp-dl-tip{width:280px;box-sizing:border-box;padding:12px 14px;display:flex;flex-direction:column;gap:6px;pointer-events:none;font-size:13px;animation:sp-dl-tip-in .14s ease-out;}
+.sp-pop.sp-dl-tip{width:280px;box-sizing:border-box;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:13px;}
 .sp-pop.sp-dl-tip--idle{width:auto;padding:10px 16px;text-align:center;align-items:center;}
 .sp-dl-tip-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sp-dl-tip-row{display:flex;align-items:center;gap:10px;font-variant-numeric:tabular-nums;}
@@ -121,8 +121,7 @@ ${hdrImages}
 .sp-dl-tip-bar{flex:1;height:4px;border-radius:2px;background:var(--sp-line);overflow:hidden;}
 .sp-dl-tip-bar > i{display:block;height:100%;border-radius:2px;background:var(--sp-accent);transition:width .6s ease;}
 .sp-dl-tip-facts{font-size:12.5px;font-variant-numeric:tabular-nums;}
-@keyframes sp-dl-tip-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
-@media (prefers-reduced-motion:reduce){.sp-dl-tip{animation:none;}.sp-dl-tip-bar > i{transition:none;}}
+@media (prefers-reduced-motion:reduce){.sp-dl-tip-bar > i{transition:none;}}
 /* Menus de la barre : seul « Steam » reste, habillé ; les autres passent dans Paramètres › Steam */
 .RootMenuBar{padding-left:10px !important;gap:0;}
 .RootMenuBar > .RootMenuButton:not(:first-child){display:none !important;}
@@ -608,6 +607,14 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .DesktopUI .EulaModalDialog .EULAError{background:var(--sp-surface2) !important;border:1px solid var(--sp-line) !important;border-radius:var(--sp-r-md) !important;color:var(--sp-text) !important;}
 .sp-avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;color:#0a0d12;flex:none;}
 .sp-pop{position:fixed;z-index:1000;background:var(--sp-surface);border:1px solid var(--sp-line);border-radius:var(--sp-r-md);box-shadow:0 18px 44px rgba(0,0,0,.55);padding:6px;font-family:var(--sp-font);color:var(--sp-text);font-size:14px;}
+/* Menus et bulles de la barre du haut ouverts en vraie fenêtre (core/popupWindow.tsx) : le cadre du menu contextuel de Steam s'efface (l'écart avec le bouton vient d'une ancre décalée, pas d'une marge : rien de transparent) */
+.contextMenu:has(.sp-popwin){background:transparent !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;padding:0 !important;min-width:0 !important;}
+.contextMenu:has(.sp-popwin) .contextMenuContents{padding:0 !important;overflow:visible !important;}
+.sp-pop.sp-popwin{position:static;box-shadow:none;animation:sp-popwin-in .14s ease-out;}
+@keyframes sp-popwin-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){.sp-pop.sp-popwin{animation:none;}}
+/* macOS : les fenêtres de menu ne sont pas transparentes (le transparent y est peint en noir) : coins droits, sans quoi les arrondis laissent voir du noir */
+html.sp-mac.MillenniumWindow_ContextMenu :is(.contextMenu,.sp-pop){border-radius:0 !important;}
 .sp-pop-item{display:flex;align-items:center;gap:12px;width:100%;min-height:40px;padding:6px 10px;border:0;border-radius:var(--sp-r-sm);background:transparent;text-align:left;}
 .sp-pop-item:hover,.sp-pop-item[aria-checked="true"]{background:var(--sp-surface2);}
 .sp-sep{height:1px;background:var(--sp-line);margin:4px 6px;}
@@ -633,12 +640,10 @@ body.sp-has-player .sp-root{padding-bottom:110px;}
 .sp-navpill{display:none;position:relative;-webkit-app-region:no-drag;}
 .sp-navpill-current{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 14px;border-radius:16px;border:1px solid var(--sp-line);background:var(--sp-surface2);color:var(--sp-text);font-family:var(--sp-font);font-weight:700;font-size:14px;cursor:pointer;-webkit-app-region:no-drag;corner-shape:round !important;}
 .sp-navpill-current svg{color:var(--sp-muted);transition:transform .15s;}
-.sp-navpill-menu{position:absolute;top:100%;left:0;z-index:1000;padding-top:6px;visibility:hidden;opacity:0;transform:translateY(-4px);transition:opacity .14s,transform .14s,visibility 0s linear .14s;-webkit-app-region:no-drag;}
-.sp-navpill-list{min-width:190px;padding:6px;border-radius:var(--sp-r-md);background:var(--sp-surface);border:1px solid var(--sp-line);box-shadow:0 18px 44px rgba(0,0,0,.55);font-family:var(--sp-font);}
-.sp-navpill:hover .sp-navpill-menu,.sp-navpill:focus-within .sp-navpill-menu{visibility:visible;opacity:1;transform:none;transition:opacity .14s,transform .14s;}
-.sp-navpill:hover .sp-navpill-current,.sp-navpill:focus-within .sp-navpill-current{border-color:var(--sp-accent);}
-.sp-navpill:hover .sp-navpill-current svg,.sp-navpill:focus-within .sp-navpill-current svg{transform:rotate(180deg);}
-@media (prefers-reduced-motion:reduce){.sp-navpill-menu,.sp-navpill-current svg{transition:none;}}
+.sp-navpill-list{min-width:190px;}
+.sp-navpill:hover .sp-navpill-current,.sp-navpill-current:focus-visible,.sp-navpill-current[aria-expanded="true"]{border-color:var(--sp-accent);}
+.sp-navpill-current[aria-expanded="true"] svg{transform:rotate(180deg);}
+@media (prefers-reduced-motion:reduce){.sp-navpill-current svg{transition:none;}}
 .sp-arrow{width:32px;height:32px;border:0;border-radius:var(--sp-r-sm);background:transparent;color:var(--sp-muted);display:inline-flex;align-items:center;justify-content:center;}
 .sp-arrow:hover{background:var(--sp-surface2);color:var(--sp-text);}
 .sp-presence{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px 0 3px;margin:0 4px;border-radius:16px;border:1px solid var(--sp-line);background:var(--sp-surface2);color:var(--sp-text);font-family:var(--sp-font);}
@@ -822,8 +827,12 @@ export function refreshCssSections(doc: Document | null | undefined) {
 }
 
 /** Injecte (ou met à jour) la feuille de style dans un document Steam. */
+/** macOS : repéré par une classe sur chaque fenêtre (fenêtres de menu opaques, voir la règle `html.sp-mac`). */
+const IS_MAC = /Mac/i.test(navigator.platform || '');
+
 export function applyCss(doc: Document, full: string) {
 	if (!doc?.head) return;
+	if (IS_MAC) doc.documentElement.classList.add('sp-mac');
 	let el = doc.getElementById('sp-theme') as HTMLStyleElement | null;
 	if (!el) {
 		el = doc.createElement('style');

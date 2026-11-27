@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { goBack, goForward, usePath } from '../core/history';
+import { openPopupWindow, PopupWindow } from '../core/popupWindow';
 import { mainWindow, navigate, openSteamWeb, PRESENCE, presenceState, ROUTES, schedulePresenceReturn, selfPersona, setPresence } from '../core/steam';
 import { setSetting, useSettings } from '../core/settings';
 import { beforeNextFrame } from '../core/transitions';
@@ -51,6 +52,7 @@ export function NavBar() {
 	];
 	const current = items.find((it) => it.active);
 	const activeIndex = items.indexOf(current as any);
+	const pill = usePillMenu(items.filter((it) => it !== current));
 	const navRef = useRef<HTMLElement>(null);
 	const indRef = useRef<HTMLSpanElement>(null);
 	// Pastille de l'onglet actif : elle glisse d'un onglet à l'autre (placée sans animation la première fois)
@@ -94,35 +96,93 @@ export function NavBar() {
 					</button>
 				))}
 			</nav>
-			{/* Fenêtre étroite : les onglets se replient en une pilule qui se déploie au survol (CSS, voir theme.ts) */}
-			<div className="sp-navpill">
-				<button type="button" className="sp-navpill-current" aria-haspopup="menu">
+			{/* Fenêtre étroite : les onglets se replient en une pilule (theme.ts) dont le menu s'ouvre au survol ou au clic */}
+			<div className="sp-navpill" onMouseEnter={pill.enter} onMouseLeave={pill.leave}>
+				<button type="button" className="sp-navpill-current" aria-haspopup="menu" aria-expanded={pill.open} onClick={pill.click}>
 					{current?.label || 'Navigation'}
 					<Chevron />
 				</button>
-				<div className="sp-navpill-menu" role="menu" aria-label="Aller à">
-					<div className="sp-navpill-list">
-						{items
-							.filter((it) => it !== current)
-							.map((it) => (
-								<button
-									key={it.label}
-									type="button"
-									role="menuitem"
-									className="sp-pop-item"
-									onClick={(e) => {
-										(e.currentTarget as HTMLElement).blur();
-										it.go();
-									}}
-								>
-									{it.label}
-								</button>
-							))}
-					</div>
-				</div>
 			</div>
 		</div>
 	);
+}
+
+type NavItem = { label: string; go: () => void };
+
+/** Délai avant de refermer le menu de la pilule quand la souris la quitte (le temps d'atteindre sa fenêtre). */
+const PILL_LEAVE_DELAY = 180;
+
+/**
+ * Menu de la pilule de navigation, dans une vraie fenêtre (core/popupWindow.tsx) pour passer au-dessus des pages web.
+ * Survol : s'ouvre sans prendre le focus et se referme quand la souris quitte la pilule et le menu.
+ * Clic (ou Entrée) : s'ouvre avec le focus et se referme au clic ailleurs.
+ */
+function usePillMenu(entries: NavItem[]) {
+	const [open, setOpen] = useState(false);
+	const win = useRef<PopupWindow | null>(null);
+	const timer = useRef<any>(0);
+	const closedAt = useRef(0);
+	const list = useRef(entries);
+	list.current = entries;
+
+	useEffect(
+		() => () => {
+			clearTimeout(timer.current);
+			win.current?.close();
+		},
+		[],
+	);
+
+	const cancelClose = () => clearTimeout(timer.current);
+	const scheduleClose = () => {
+		clearTimeout(timer.current);
+		timer.current = setTimeout(() => win.current?.close(), PILL_LEAVE_DELAY);
+	};
+	const show = (anchor: Element, hover: boolean) => {
+		cancelClose();
+		if (win.current) return;
+		setOpen(true);
+		win.current = openPopupWindow(
+			<div className="sp-pop sp-popwin sp-navpill-list" role="menu" aria-label="Aller à" onMouseEnter={cancelClose} onMouseLeave={hover ? scheduleClose : undefined}>
+				{list.current.map((it) => (
+					<button
+						key={it.label}
+						type="button"
+						role="menuitem"
+						className="sp-pop-item"
+						onClick={() => {
+							win.current?.close();
+							it.go();
+						}}
+					>
+						{it.label}
+					</button>
+				))}
+			</div>,
+			anchor,
+			{
+				align: 'left',
+				tooltip: hover,
+				onClose: () => {
+					clearTimeout(timer.current);
+					win.current = null;
+					closedAt.current = Date.now();
+					setOpen(false);
+				},
+			},
+		);
+	};
+	return {
+		open,
+		enter: (e: { currentTarget: EventTarget }) => show(e.currentTarget as Element, true),
+		leave: scheduleClose,
+		click: (e: { currentTarget: EventTarget }) => {
+			// Déjà ouvert au survol : le clic le laisse ouvert ; juste refermé par ce clic (perte du focus) : on ne le rouvre pas
+			if (win.current || Date.now() - closedAt.current < 300) return;
+			const el = e.currentTarget as Element;
+			show(el.parentElement || el, false);
+		},
+	};
 }
 
 const RETURN_CHOICES = [0, 30, 60, 120, 240];
@@ -134,14 +194,12 @@ function steamId64(): string {
 /** Bouton de compte : présence toujours visible + actions du compte (remplace le menu « pseudo ▾ » de Steam). */
 export function AccountButton() {
 	const [open, setOpen] = useState(false);
-	const [confirmLogout, setConfirmLogout] = useState(false);
 	const [state, setState] = useState(presenceState());
-	const s = useSettings();
 	const btn = useRef<HTMLButtonElement>(null);
-	const pop = useRef<HTMLDivElement>(null);
+	const win = useRef<PopupWindow | null>(null);
+	const closedAt = useRef(0);
 	const me = selfPersona();
 	const current = PRESENCE.find((p) => p.state === state) || PRESENCE[0];
-	const balance: string = w.App?.m_CurrentUser?.strAccountBalance || '';
 	// Après un rechargement, Steam remplit le profil (nom, photo) un peu après : on suit aussi ces deux valeurs
 	const [, setPersonaKey] = useState(`${me.name}|${me.avatar || ''}`);
 
@@ -151,41 +209,35 @@ export function AccountButton() {
 			const p = selfPersona();
 			setPersonaKey(`${p.name}|${p.avatar || ''}`);
 		}, 1500);
-		return () => clearInterval(id);
+		return () => {
+			clearInterval(id);
+			win.current?.close();
+		};
 	}, []);
 
-	useEffect(() => {
-		if (!open) {
-			setConfirmLogout(false);
-			return undefined;
+	// Le menu s'ouvre dans une vraie fenêtre (core/popupWindow.tsx) pour passer au-dessus des pages web de Valve.
+	// Clic ailleurs ou Échap : Steam ferme la fenêtre, onClose remet le bouton à jour.
+	const toggle = () => {
+		if (win.current) {
+			win.current.close();
+			return;
 		}
-		const doc = btn.current?.ownerDocument;
-		const onDown = (e: MouseEvent) => {
-			if (!pop.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false);
-		};
-		const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-		doc?.addEventListener('mousedown', onDown);
-		doc?.addEventListener('keydown', onKey);
-		return () => {
-			doc?.removeEventListener('mousedown', onDown);
-			doc?.removeEventListener('keydown', onKey);
-		};
-	}, [open]);
-
-	const rect = btn.current?.getBoundingClientRect();
-	const choose = (st: number) => {
-		setPresence(st);
-		setState(st);
-		schedulePresenceReturn(s.presenceReturnMinutes, st);
-	};
-	const act = (fn: () => void) => () => {
-		setOpen(false);
-		fn();
+		// Le clic sur le bouton vient de refermer le menu (sa fenêtre a perdu le focus) : on ne le rouvre pas
+		if (Date.now() - closedAt.current < 300 || !btn.current) return;
+		setOpen(true);
+		win.current = openPopupWindow(<AccountMenu onPresence={setState} close={() => win.current?.close()} />, btn.current, {
+			align: 'right',
+			onClose: () => {
+				win.current = null;
+				closedAt.current = Date.now();
+				setOpen(false);
+			},
+		});
 	};
 
 	return (
 		<>
-			<button ref={btn} type="button" className="sp-presence" aria-expanded={open} aria-haspopup="menu" aria-label={`${me.name}, statut : ${current.label}. Ouvrir le menu du compte`} onClick={() => setOpen(!open)}>
+			<button ref={btn} type="button" className="sp-presence" aria-expanded={open} aria-haspopup="menu" aria-label={`${me.name}, statut : ${current.label}. Ouvrir le menu du compte`} onClick={toggle}>
 				<span style={{ position: 'relative', width: 26, height: 26, flex: 'none' }}>
 					{me.avatar ? (
 						<img src={me.avatar} alt="" style={{ width: 26, height: 26, borderRadius: '50%', display: 'block' }} />
@@ -200,55 +252,75 @@ export function AccountButton() {
 				</span>
 				<Chevron up={open} />
 			</button>
-			{open && rect && (
-				<div ref={pop} className="sp-pop" role="menu" aria-label="Compte et présence" style={{ top: rect.bottom + 8, right: Math.max(8, (mainWindow()?.innerWidth || 0) - rect.right), width: 310 }}>
-					<div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px 10px' }}>
-						{me.avatar && <img src={me.avatar} alt="" style={{ width: 40, height: 40, borderRadius: '50%' }} />}
-						<span style={{ display: 'flex', flexDirection: 'column' }}>
-							<span style={{ fontWeight: 800 }}>{me.name}</span>
-							{balance && <span className="sp-muted" style={{ fontSize: 12 }}>Portemonnaie : {balance}</span>}
-						</span>
-					</div>
-					<div className="sp-sep" />
-					<div className="sp-label" style={{ padding: '8px 10px 6px' }}>Ma présence</div>
-					{PRESENCE.map((p) => (
-						<button key={p.state} type="button" role="menuitemradio" aria-checked={p.state === state} className="sp-pop-item" onClick={() => choose(p.state)}>
-							<span style={{ width: 11, height: 11, borderRadius: '50%', background: p.color, flex: 'none' }} />
-							<span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-								<span style={{ fontWeight: 700 }}>{p.label}</span>
-								<span className="sp-muted" style={{ fontSize: 12 }}>{p.sub}</span>
-							</span>
-						</button>
-					))}
-					<div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 13 }}>
-						<span className="sp-muted" style={{ flex: 1 }}>Revenir « En ligne » après</span>
-						<select className="sp-input" style={{ height: 32, width: 100 }} value={s.presenceReturnMinutes} onChange={(e) => {
-								const m = Number((e.target as HTMLSelectElement).value);
-								setSetting('presenceReturnMinutes', m);
-								// s'applique aussi à l'absence en cours
-								schedulePresenceReturn(m, state);
-							}}>
-							{(RETURN_CHOICES.includes(s.presenceReturnMinutes) ? RETURN_CHOICES : [...RETURN_CHOICES, s.presenceReturnMinutes].sort((a, b) => a - b)).map((m) => (
-								<option key={m} value={m}>{m === 0 ? 'jamais' : m < 60 || m % 60 ? `${m} min` : `${m / 60} h`}</option>
-							))}
-						</select>
-					</div>
-					<div className="sp-sep" />
-					<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb(`https://steamcommunity.com/profiles/${steamId64()}/`))}>Voir mon profil</button>
-					<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb('https://store.steampowered.com/account/'))}>Détails du compte</button>
-					<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb('https://store.steampowered.com/account/preferences/'))}>Préférences du magasin</button>
-					<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb('https://store.steampowered.com/account/history/'))}>Mon portemonnaie</button>
-					<div className="sp-sep" />
-					<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => w.SteamClient.User.ChangeUser())}>Changer de compte…</button>
-					{confirmLogout ? (
-						<button type="button" role="menuitem" className="sp-pop-item" style={{ color: 'var(--sp-busy)', fontWeight: 700 }} onClick={act(() => w.SteamClient.User.SignOutAndRestart())}>
-							Confirmer : se déconnecter et redémarrer Steam
-						</button>
-					) : (
-						<button type="button" role="menuitem" className="sp-pop-item" onClick={() => setConfirmLogout(true)}>Se déconnecter du compte…</button>
-					)}
-				</div>
-			)}
 		</>
+	);
+}
+
+/** Contenu du menu du compte, rendu dans sa fenêtre. */
+function AccountMenu({ onPresence, close }: { onPresence: (state: number) => void; close: () => void }) {
+	const [state, setState] = useState(presenceState());
+	const [confirmLogout, setConfirmLogout] = useState(false);
+	const s = useSettings();
+	const me = selfPersona();
+	const balance: string = w.App?.m_CurrentUser?.strAccountBalance || '';
+	const choose = (st: number) => {
+		setPresence(st);
+		setState(st);
+		onPresence(st);
+		schedulePresenceReturn(s.presenceReturnMinutes, st);
+	};
+	const act = (fn: () => void) => () => {
+		close();
+		fn();
+	};
+
+	return (
+		<div className="sp-pop sp-popwin" role="menu" aria-label="Compte et présence" style={{ width: 310 }}>
+			<div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px 10px' }}>
+				{me.avatar && <img src={me.avatar} alt="" style={{ width: 40, height: 40, borderRadius: '50%' }} />}
+				<span style={{ display: 'flex', flexDirection: 'column' }}>
+					<span style={{ fontWeight: 800 }}>{me.name}</span>
+					{balance && <span className="sp-muted" style={{ fontSize: 12 }}>Portemonnaie : {balance}</span>}
+				</span>
+			</div>
+			<div className="sp-sep" />
+			<div className="sp-label" style={{ padding: '8px 10px 6px' }}>Ma présence</div>
+			{PRESENCE.map((p) => (
+				<button key={p.state} type="button" role="menuitemradio" aria-checked={p.state === state} className="sp-pop-item" onClick={() => choose(p.state)}>
+					<span style={{ width: 11, height: 11, borderRadius: '50%', background: p.color, flex: 'none' }} />
+					<span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+						<span style={{ fontWeight: 700 }}>{p.label}</span>
+						<span className="sp-muted" style={{ fontSize: 12 }}>{p.sub}</span>
+					</span>
+				</button>
+			))}
+			<div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 13 }}>
+				<span className="sp-muted" style={{ flex: 1 }}>Revenir « En ligne » après</span>
+				<select className="sp-input" style={{ height: 32, width: 100 }} value={s.presenceReturnMinutes} onChange={(e) => {
+						const m = Number((e.target as HTMLSelectElement).value);
+						setSetting('presenceReturnMinutes', m);
+						// s'applique aussi à l'absence en cours
+						schedulePresenceReturn(m, state);
+					}}>
+					{(RETURN_CHOICES.includes(s.presenceReturnMinutes) ? RETURN_CHOICES : [...RETURN_CHOICES, s.presenceReturnMinutes].sort((a, b) => a - b)).map((m) => (
+						<option key={m} value={m}>{m === 0 ? 'jamais' : m < 60 || m % 60 ? `${m} min` : `${m / 60} h`}</option>
+					))}
+				</select>
+			</div>
+			<div className="sp-sep" />
+			<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb(`https://steamcommunity.com/profiles/${steamId64()}/`))}>Voir mon profil</button>
+			<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb('https://store.steampowered.com/account/'))}>Détails du compte</button>
+			<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb('https://store.steampowered.com/account/preferences/'))}>Préférences du magasin</button>
+			<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => openSteamWeb('https://store.steampowered.com/account/history/'))}>Mon portemonnaie</button>
+			<div className="sp-sep" />
+			<button type="button" role="menuitem" className="sp-pop-item" onClick={act(() => w.SteamClient.User.ChangeUser())}>Changer de compte…</button>
+			{confirmLogout ? (
+				<button type="button" role="menuitem" className="sp-pop-item" style={{ color: 'var(--sp-busy)', fontWeight: 700 }} onClick={act(() => w.SteamClient.User.SignOutAndRestart())}>
+					Confirmer : se déconnecter et redémarrer Steam
+				</button>
+			) : (
+				<button type="button" role="menuitem" className="sp-pop-item" onClick={() => setConfirmLogout(true)}>Se déconnecter du compte…</button>
+			)}
+		</div>
 	);
 }
